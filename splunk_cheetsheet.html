@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Interactive Splunk SPL Guide</title>
+    <!--
+    Application Design Rationale:
+    - Structure: A single-page app with a sticky sidebar for navigation and a main content area for command details. This allows for both structured browsing and quick, targeted searches.
+    - Color Palette: A vibrant, high-contrast theme with green and dark slate was chosen to improve visual appeal and differentiate UI elements clearly, enhancing readability in both light and dark modes.
+    - Interactivity & Animation:
+        - Live Search: Instantly filters all content, providing immediate access to relevant commands and scenarios.
+        - Click-to-Copy: A core feature for a developer tool, streamlining the process of using example code.
+        - Dynamic Chart: The command types chart is generated from the actual data in the guide, providing a live, accurate visualization of the command distribution.
+        - Staggered Animations: Content cards now fade and slide into view as the user scrolls, creating a more engaging and modern feel. This is implemented using the Intersection Observer API for performance.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        pre, code {
+            font-family: 'Fira Code', monospace;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 450px;
+            }
+        }
+        .pipeline-step, .nav-link, .copy-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .pipeline-step:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .dark .pipeline-step:hover {
+           box-shadow: 0 10px 15px -3px rgb(22 163 74 / 0.2), 0 4px 6px -4px rgb(22 163 74 / 0.2);
+        }
+
+        /* Animation for content cards */
+        .card-animate {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .card-animate.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': {
+                            '500': '#16a34a', // green-600
+                            '600': '#15803d'  // green-700
+                         },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300">
+
+    <div class="flex flex-col md:flex-row min-h-screen">
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-64 bg-white dark:bg-slate-950 border-b dark:border-b-0 md:border-r border-slate-200 dark:border-slate-800 p-4 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-200">SPL Guide</h1>
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
+                    <svg id="theme-toggle-dark-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                    <svg id="theme-toggle-light-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                </button>
+            </div>
+            
+            <div class="relative mb-4">
+                <input type="search" id="commandSearch" placeholder="Search commands..." class="w-full pl-8 pr-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500">
+                <svg class="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+
+            <nav id="navigation" class="space-y-2">
+                <!-- Static navigation links will be inserted here by JS on load -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-8 lg:p-12 overflow-y-auto">
+            <div id="content-container">
+                <!-- All content sections will be injected here -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const splData = {
+            sections: [
+                { id: 'introduction', title: 'Introduction to SPL', intro: 'Welcome to the definitive interactive guide for mastering Splunk\'s Search Processing Language (SPL). Splunk is a powerful platform for searching, analyzing, and visualizing machine-generated data. SPL is the language you use to communicate with your data in Splunk. This guide is designed for all skill levels, from beginners to power users aiming to write the most efficient and sophisticated queries possible.' },
+                {
+                    id: 'fundamentals', title: 'SPL Fundamentals', intro: 'Before diving into specific commands, it\'s crucial to understand the core mechanics of how Splunk and SPL work. This section explains the search pipeline, key data concepts, command types, and logical operations that underpin every query you will write. A solid grasp of these principles is the first and most important step toward writing efficient and powerful searches.',
+                    content: '...' // Populated below
+                },
+                {
+                    id: 'core-commands', title: 'Core: Find, Shape, Structure', intro: 'This section covers the essential commands that form the backbone of nearly every Splunk search. These are the tools you will use daily to find, filter, extract, manipulate, and structure your data for analysis and reporting.',
+                    commands: [
+                        { name: 'search', purpose: 'Retrieves events from indexes and performs initial, high-level filtering.', analysis: 'Most performant when filtering on indexed fields (`index`, `sourcetype`, `host`, `_time`). The `AND` operator is implied between terms. `NOT` is more efficient than `!=`.', tier: 'Generating', examples: [ 
+                            {title: 'Basic Filtering', code: 'index=web sourcetype=access_combined host=webserver01 status=5*', explanation: 'This query efficiently retrieves events by first filtering on indexed fields. It looks in the "web" index for events of type "access_combined" from "webserver01" where the HTTP status code starts with a 5 (e.g., 500, 503).'}, 
+                            {title: 'Boolean Logic', code: 'sourcetype=linux_secure (sshd:fail* OR "authentication failure") \n| search src_ip=10.1.1.* NOT user=root', explanation: 'This finds Linux secure logs containing either "sshd:fail" or the exact phrase "authentication failure". It then further filters these results to only include source IPs from the 10.1.1.x subnet, excluding any events where the user is "root".'} 
+                        ]},
+                        { name: 'where', purpose: 'Filters results using `eval`-style expressions, allowing for complex comparisons.', analysis: 'Powerful for comparing two fields (e.g., `bytes_out > bytes_in`). Use mid-pipeline; avoid using it for simple filtering that `search` can do. Can be slower than `search` as it is not index-optimized.', tier: 'Streaming', examples: [ 
+                            {title: 'Field-to-Field Comparison', code: 'sourcetype=firewall \n| where bytes_out > (bytes_in * 2)', explanation: 'This search retrieves firewall logs and then uses `where` to find events where the outbound traffic is more than double the inbound traffic, a comparison impossible with the `search` command.'}, 
+                            {title: 'Filtering with Functions', code: 'index=auth action=failure \n| stats count by user \n| where count > 10 AND len(user) < 4', explanation: 'First, it calculates the number of failed logins per user. Then, `where` filters this transformed result to find users with more than 10 failures AND a username shorter than 4 characters.'} 
+                        ]},
+                        { name: 'eval', purpose: 'Calculates an expression and puts the resulting value into a new or existing field.', analysis: 'Chain multiple assignments with commas for efficiency (e.g., `eval a=1, b=2`). Possesses a rich library of functions like `if()`, `case()`, `tostring()`, `tonumber()` for math, string, and conditional operations.', tier: 'Streaming', examples: [ 
+                            {title: 'Calculation & Formatting', code: 'sourcetype=file_transfer \n| eval MB_transferred = round(bytes/1048576, 2), transfer_time = tostring(duration_sec, "duration")', explanation: 'This calculates two new fields in one command: `MB_transferred` by converting bytes to megabytes and rounding to two decimal places, and `transfer_time` by formatting a seconds value into a human-readable HH:MM:SS string.'}, 
+                            {title: 'Conditional Logic with case()', code: 'sourcetype=ids_alert \n| eval risk_level = case(severity="high", "Critical", severity="medium", "High", true(), "Low")', explanation: 'This uses the `case()` function to create a `risk_level` field. It checks the `severity` field and assigns a value accordingly, with `true()` serving as a default "else" condition.'} 
+                        ]},
+                        { name: 'rex', purpose: 'Extracts fields from raw text using regular expressions (PCRE).', analysis: 'Always specify `field=` for better performance. Use `mode=sed` for powerful search-and-replace operations for data cleaning or anonymization. Use non-capturing groups `(?:...)` to improve regex efficiency.', tier: 'Streaming', examples: [ 
+                            {title: 'Targeted Extraction', code: 'index=firewall \n| rex field=_raw "user (?<user>\\w+) from (?<src_ip>\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})"', explanation: 'This extracts values from the raw log message. It looks for the pattern "user [some_word] from [some_ip]" and assigns the matched values to new fields named `user` and `src_ip`.'}, 
+                            {title: 'Data Anonymization (SED Mode)', code: 'index=transactions \n| rex field=message mode=sed "s/(\\d{4}-){3}\\d{4}/XXXX-XXXX-XXXX-XXXX/g"', explanation: 'This uses `rex` in search-and-replace mode (`sed`) to find a pattern matching a credit card number within the `message` field and replaces it with a masked string for compliance.'} 
+                        ]},
+                        { name: 'dedup', purpose: 'Removes duplicate results based on a specified field or combination of fields.', analysis: 'A dataset processing command. Use `sortby` to control which event is kept (e.g., `dedup user sortby -_time` keeps the most recent event for each user). Use `dedup 3 user` to keep the first 3 events for each user.', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Keep Most Recent Login', code: 'index=auth action=login \n| dedup user sortby -_time', explanation: 'This command groups events by `user` and, for each user, discards all but the most recent event (because of `sortby -_time`). The result is a list of the last login for every user.'}, 
+                            {title: 'Unique Source IPs per Host', code: 'index=netflow \n| dedup src_ip, dest_host', explanation: 'This removes duplicate events based on the unique combination of `src_ip` and `dest_host`, effectively giving you a list of every unique connection pair observed.'} 
+                        ]},
+                        { name: 'rename', purpose: 'Changes the name of one or more fields for clarity or standardization.', analysis: 'Use wildcards (*) for bulk renaming (e.g., `rename avg(*) as average_*`). The number of wildcards must match in the source and destination patterns. Essential for CIM compliance.', tier: 'Streaming', examples: [ 
+                            {title: 'Simple and Multiple Rename', code: '... \n| rename uid AS "User ID", dest AS "Destination IP"', explanation: 'This renames the field `uid` to the more readable "User ID" and `dest` to "Destination IP". The quotes are required because the new names contain spaces.'}, 
+                            {title: 'Wildcard Rename', code: '... \n| stats sum(sales_*) as sum_sales_* by product \n| rename sum_sales_* AS "Total Sales in *"', explanation: 'After a `stats` command creates fields like `sum_sales_US` and `sum_sales_EU`, this uses a wildcard to rename them all to a cleaner format like "Total Sales in US" and "Total Sales in EU".'} 
+                        ]},
+                        { name: 'table', purpose: 'Returns a table containing only the specified fields in the specified order.', analysis: 'Excellent for final output, but it is a transforming command. For simply removing fields mid-pipeline, use the more performant `fields` command.', tier: 'Transforming', examples: [ 
+                            {title: 'Basic Ordered Table', code: 'index=auth \n| table _time, user, src_ip, action, status', explanation: 'This command produces a clean table containing only the five specified fields, displayed in the exact order they are listed. It discards all other fields.'}, 
+                            {title: 'Table with Wildcards', code: 'index=web \n| table _time, clientip, status, http_*', explanation: 'This creates a table with the `_time`, `clientip`, and `status` fields, plus any other field that begins with "http_", such as `http_method` or `http_user_agent`.'} 
+                        ]},
+                        { name: 'fields', purpose: 'Keeps (+) or removes (-) fields from search results.', analysis: 'A critical optimization command. Use `| fields - _raw` after extractions to significantly reduce the memory footprint of your search before a transforming command.', tier: 'Streaming', examples: [ 
+                            {title: 'Excluding Fields for Performance', code: 'index=security \n| rex ... \n| fields - _raw \n| stats count by user', explanation: 'After `rex` has extracted the needed fields, `fields - _raw` removes the large, original raw text of the event. This makes the downstream `stats` command much faster as it has less data to process.'}, 
+                            {title: 'Including Fields for Focus', code: 'index=performance \n| fields + host, cpu_usage, mem_usage', explanation: 'This command removes all fields from the results *except* for `host`, `cpu_usage`, and `mem_usage`, ensuring the pipeline only carries the data needed for subsequent commands.'} 
+                        ]},
+                        { name: 'sort', purpose: 'Arranges the entire result set based on the values in one or more specified fields.', analysis: 'A dataset processing command; use it as late as possible in the pipeline. Use a minus sign (-) for descending order. A numeric limit (e.g., `sort 100`) can find top/bottom results efficiently and is faster than sorting the entire dataset.', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Multi-field Sort', code: '... \n| stats sum(price) as total_sales by category, product \n| sort category, -total_sales', explanation: 'This sorts a sales report first by `category` in alphabetical (ascending) order, and then within each category, it sorts by `total_sales` in descending order (highest sales first).'}, 
+                            {title: 'Sorting with a Limit for Top N', code: '... \n| stats sum(bytes) as total_bytes by host \n| sort 50 -total_bytes', explanation: 'This command first calculates the total bytes per host, then sorts all hosts by that total in descending order, but only keeps the top 50 results. This is an efficient way to find the "top 50".'} 
+                        ]},
+                        { name: 'fillnull', purpose: 'Replaces null values in fields with a specified string or number.', analysis: 'Very useful for cleaning up data before charting or performing calculations. Use `value="N/A"` for strings or `value=0` for numbers. Can be applied to a list of fields.', tier: 'Streaming', examples: [ 
+                            {title: 'Replace Missing Numeric Values', code: '... \n| timechart span=1h sum(sales) by category \n| fillnull value=0', explanation: 'After creating a timechart of sales, some time buckets might have no sales, resulting in a null value. `fillnull` replaces these nulls with 0, which prevents gaps in a line or column chart.'}, 
+                            {title: 'Replace Missing String Values', code: '... \n| stats values(product) as Products by user \n| fillnull value="No Products Purchased"', explanation: 'This query first finds all products purchased by each user. For users who purchased nothing, the `Products` field would be null. `fillnull` replaces this with a descriptive string.'} 
+                        ]},
+                        { name: 'bin', purpose: 'Groups continuous numerical values into discrete sets, or "bins".', analysis: 'This command is the engine behind `timechart`\'s time bucketing but can be used on any numeric field. It is essential for creating histograms or grouping data for statistical analysis. Alias of `bucket`.', tier: 'Streaming', examples: [
+                            {title: 'Create Response Time Bins', code: 'index=web \n| bin response_time span=100 \n| stats count by response_time', explanation: 'This takes the `response_time` field and groups it into buckets of 100 (0-99, 100-199, etc.). `stats` then counts how many events fall into each bucket, effectively creating a histogram of response times.'},
+                            {title: 'Align Events to the Hour', code: 'index=auth \n| bin _time span=1h \n| stats dc(user) by _time', explanation: 'This command "snaps" the timestamp of each event to the beginning of the hour it occurred in. `stats` can then be used to count distinct users for each hourly bucket.'}
+                        ]},
+                        { name: 'head', purpose: 'Returns the first N results in search order.', analysis: 'A streaming command that is much faster than `sort` for simply taking the first few results as they are found. It does not reorder data. Use `tail` for the last N results.', tier: 'Streaming', examples: [
+                            {title: 'Get First 10 Errors', code: 'index=main error | head 10', explanation: 'Finds all events with the term "error" and returns only the first 10 that it encounters in the index.'},
+                            {title: 'Check Sample Data', code: 'sourcetype=my_app | head 100', explanation: 'Quickly inspects the first 100 events from a sourcetype to check their format without running a time-consuming search.'}
+                        ]},
+                        { name: 'highlight', purpose: 'Highlights specified terms in the raw event text in the UI.', analysis: 'A UI-only command that does not transform data but makes analysis easier. It can highlight multiple terms. Wildcards can be used. This command is very useful for visually scanning logs for keywords.', tier: 'Streaming', examples: [
+                            {title: 'Highlight Multiple Terms', code: 'index=security (failed OR error OR denied) | highlight "failed", "error", "denied"', explanation: 'Searches for security events and then highlights the specific words "failed", "error", and "denied" in the event viewer for easy visual identification.'},
+                            {title: 'Highlight with Wildcards', code: 'index=web status=404 | highlight "url=*product*page*"', explanation: 'Finds all "Page Not Found" errors and then highlights any URL in the raw event text that contains the words "product" and "page".'}
+                        ]}
+                    ]
+                },
+                {
+                    id: 'transforming-commands', title: 'Transforming: Aggregate & Visualize', intro: 'This section focuses on the commands essential for aggregating raw events into meaningful statistics and visualizations. These are the foundation of all reports, charts, and dashboards in Splunk, turning data into actionable insights.',
+                    commands: [
+                        { name: 'stats', purpose: 'Calculates aggregate statistics (count, sum, avg, etc.) over a set of results.', analysis: 'The workhorse of SPL. Use the `BY` clause to group results. Functions like `dc` (distinct count), `values`, `list`, and `earliest`/`latest` are extremely powerful. For better performance on large datasets with high cardinality fields, consider `tstats` or `estdc` (estimated distinct count).', tier: 'Transforming', examples: [ 
+                            {title: 'Single Field Aggregation', code: 'index=firewall action=deny \n| stats count BY dest_host \n| sort -count', explanation: 'This query counts the number of events, grouping them by the `dest_host` field. The result is a table listing each destination host and the number of deny events associated with it.'}, 
+                            {title: 'Multiple Aggregations', code: 'index=sales \n| stats sum(price) AS revenue, dc(customer_id) AS buyers, avg(items) as avg_cart_size BY category_id', explanation: 'This creates a summary table grouped by `category_id`. For each category, it calculates the total `revenue`, the number of unique `buyers`, and the average cart size. It renames the new fields with `AS` for clarity.'} 
+                        ]},
+                        { name: 'chart', purpose: 'Creates a tabular output suitable for visualizations like column, bar, and pie charts.', analysis: 'Similar to `stats` but pivots data. Use `OVER` for the x-axis and `BY` to split into series. It\'s a more direct way to get a chart-ready format than `stats` + `xyseries`.', tier: 'Transforming', examples: [ 
+                            {title: 'Basic Chart', code: 'index=sales \n| chart count OVER product_name BY store_location', explanation: 'This creates a table ready for a stacked chart. `product_name` will be the x-axis. The values will be the event `count`. `store_location` will be the series, meaning each product will have a separate bar/segment for each store.'}, 
+                            {title: 'Chart with eval', code: 'index=api_logs \n| chart eval(avg(response_ms)/1000) as "Avg Response (s)" OVER api_endpoint', explanation: 'This command calculates the average response time directly inside the `chart` command, converts it to seconds, and renames it. The resulting chart will show each `api_endpoint` on the x-axis and its average response time in seconds on the y-axis.'} 
+                        ]},
+                        { name: 'xyseries', purpose: 'Transforms results into a format where one field becomes the X-axis, another becomes the Y-axis (series), and a third becomes the values.', analysis: 'A powerful, explicit alternative to `chart`. It gives you more control over the table structure. The syntax is `... | xyseries <x-axis-field> <y-axis-field> <value-field>`. Almost always requires a `stats` or `chart` command first.', tier: 'Transforming', examples: [
+                            {title: 'Pivoting Stats Output', code: 'index=auth \n| stats count by user, action \n| xyseries user, action, count', explanation: 'First, `stats` creates a table with three columns: user, action, and count. `xyseries` then pivots this table: the `user` values become rows, the `action` values (e.g., "login", "logout") become columns, and the `count` values fill the cells.'},
+                            {title: 'Chart-Ready Data from Raw Events', code: 'index=sales \n| xyseries store_location, product_name, price', explanation: 'This is not a good use case, as `price` is not aggregated. It would show the price of the *last seen event* for each store/product combination. It highlights the need to use `stats` or `chart` for aggregation before pivoting data.'}
+                        ]},
+                        { name: 'timechart', purpose: 'A specialized command for creating time-series visualizations where the x-axis is always time.', analysis: 'The `span` argument is critical for defining the time buckets (e.g., `span=1h`). Use the `BY` clause to create a multi-series chart for comparisons. For partial time buckets at the start/end of a search, use `partial=f` to exclude them.', tier: 'Transforming', examples: [ 
+                            {title: 'Simple Timechart', code: 'index=web status=500 \n| timechart span=1m count', explanation: 'This creates a time-series chart of web server errors. It groups events into one-minute (`span=1m`) buckets and counts the number of events in each bucket.'}, 
+                            {title: 'Timechart with Split-by', code: 'sourcetype=cpu host=web* \n| timechart span=10m avg(cpu_percent) BY host', explanation: 'This charts the average CPU percentage over time, split out by host. It creates a separate line on the chart for each web server, making it easy to compare their CPU usage in 10-minute intervals.'} 
+                        ]},
+                        { name: 'top', purpose: 'Returns the most frequent values of a field, including count and percentage.', analysis: 'A convenient shortcut for `| stats count by <field> | sort -count`. Use the `limit` option to control the number of results (default is 10). Use `showperc=f` to hide the percentage column.', tier: 'Transforming', examples: [ 
+                            {title: 'Top 10 Downloads', code: 'index=web action=download \n| top limit=10 filename', explanation: 'This finds the 10 most frequent values in the `filename` field for events where `action` is "download". It automatically adds `count` and `percent` fields to the output.'}, 
+                            {title: 'Top 3 by Category', code: 'index=auth status=failure \n| top limit=3 user by app', explanation: 'This finds the top 3 users with the most failures, but does so independently for each `app`. The result shows the top offenders for each application.'} 
+                        ]},
+                        { name: 'rare', purpose: 'The inverse of `top`, returning the least frequent values of a field.', analysis: 'Extremely useful for anomaly detection and finding outliers. It is a shortcut for `| stats count by <field> | sort count`.', tier: 'Transforming', examples: [ 
+                            {title: 'Find Uncommon Errors', code: 'index=system_logs log_level=error \n| rare limit=20 error_code', explanation: 'This is useful for finding new or unusual problems. It identifies the 20 least common `error_code` values, which might be missed in a `top` report dominated by frequent, known issues.'}, 
+                            {title: 'Find Least Active Users', code: 'index=app_access app=finance \n| rare limit=5 user', explanation: 'This query finds the 5 users who have accessed the finance app the least number of times, which could be useful for identifying inactive accounts.'} 
+                        ]},
+                    ]
+                },
+                {
+                    id: 'advanced-manipulation', title: 'Advanced Manipulation', intro: 'Go beyond basic statistics with commands that let you add running totals, work with multi-value fields, and apply logic iteratively across your dataset.',
+                    commands: [
+                         { name: 'eventstats', purpose: 'Adds aggregate statistics to every event, without removing the original event data.', analysis: 'Behaves like `stats`, but adds the calculated fields inline. Invaluable for calculating a total or average and then comparing an individual event to that aggregate (e.g., `... | eventstats sum(sales) as total_sales | eval percent_of_total = (sales/total_sales)*100`).', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Calculate Percent of Total', code: 'index=sales \n| eventstats sum(amount) as total_sales \n| eval transaction_percent = round(amount/total_sales*100, 2)', explanation: '`eventstats` first calculates the sum of `amount` from all events and adds this sum as a new field called `total_sales` to *every single event*. The `eval` command can then use this total to calculate what percentage each individual transaction contributed.'}, 
+                            {title: 'Add Group Average to Events', code: 'index=web \n| eventstats avg(response_ms) as avg_response by url \n| where response_ms > (avg_response * 2)', explanation: 'This first calculates the average `response_ms` for each distinct `url` and adds it to every event with that URL. The `where` command can then find outlier events whose response time was more than double the average for that specific URL.'} 
+                        ]},
+                        { name: 'streamstats', purpose: 'Calculates statistics on a streaming, event-by-event basis. Useful for running totals and time-based calculations.', analysis: 'Unlike `eventstats`, `streamstats` considers events seen *so far*. It is perfect for tracking changes over time. The `window` argument can create a sliding window for calculations (e.g., `window=5` calculates over the last 5 events). `reset_on_change` is powerful for restarting calculations when a field value changes.', tier: 'Streaming', examples: [
+                            {title: 'Running Total of Sales', code: 'index=sales \n| sort _time \n| streamstats sum(price) as running_total', explanation: 'This command processes events sorted by time. For each event, it calculates the sum of `price` for all events seen up to that point, creating a `running_total` field that grows with each transaction.'},
+                            {title: 'Time Between Events', code: 'index=vpn \n| sort 0 _time \n| streamstats current=f last(_time) as prev_time by user \n| eval time_diff = _time - prev_time', explanation: 'For each user, this calculates the time difference between consecutive events. `current=f` means the `last(_time)` value is from the previous event, not the current one. This is great for session analysis.'}
+                        ]},
+                        { name: 'accum', purpose: 'Calculates a running total of a numeric field.', analysis: 'A simple streaming command that is more lightweight than `streamstats` if all you need is a simple cumulative sum. The field you provide will be replaced by its running total.', tier: 'Streaming', examples: [
+                            {title: 'Cumulative Sum of Bytes', code: 'index=netflow | accum total_bytes', explanation: 'For each event, this command adds the value of `total_bytes` to the sum from the previous events, creating a running total in the `total_bytes` field.'}
+                        ]},
+                        { name: 'delta', purpose: 'Calculates the difference between the value of a field in the current event and its value in the previous event.', analysis: 'Useful for calculating rates of change. Often used after a `sort` command to ensure events are in the correct order. The results are placed in a new field.', tier: 'Streaming', examples: [
+                            {title: 'Difference in Counter Values', code: 'index=perfmon counter=PageFaults \n| sort _time \n| delta value as page_fault_delta', explanation: 'This calculates the number of page faults that occurred between performance monitoring events by subtracting the current `value` from the previous one.'}
+                        ]},
+                        { name: 'mvexpand', purpose: 'Expands a multi-value field, creating a new event for each value in the field.', analysis: 'Essential for working with fields that contain multiple values (e.g., a `recipient` field with multiple email addresses). This command "un-rolls" the values so that each one can be processed individually by commands like `stats` or `chart`. Use with `mvjoin` to combine them back.', tier: 'Streaming', examples: [
+                            {title: 'Count Individual Recipients', code: 'index=email \n| mvexpand recipients \n| stats count by recipients', explanation: 'If an email event has a `recipients` field with three addresses, `mvexpand` turns that single event into three separate events, each with a single recipient. `stats` can then correctly count the occurrences of each individual recipient address.'},
+                            {title: 'Analyze Categories', code: 'index=products \n| mvexpand categories \n| top categories', explanation: 'An event for a single product might have a `categories` field like ["electronics", "home", "audio"]. `mvexpand` creates three events from this one, allowing `top` to accurately calculate which individual categories are most common across all products.'}
+                        ]},
+                        { name: 'foreach', purpose: 'A looping command that applies a set of operations to a list of fields.', analysis: 'Extremely powerful for performing the same action on multiple columns. Use wildcards to specify the field list (e.g., `foreach host*`). The `<<FIELD>>` token is used within the sub-commands to refer to the field currently being processed in the loop.', tier: 'Streaming', examples: [
+                            {title: 'Convert Multiple Fields to MB', code: '... \n| foreach bytes_* [eval <<FIELD>> = round(<<FIELD>>/1048576, 2)]', explanation: 'This command iterates through every field that starts with "bytes_". In each iteration, it runs an `eval` command, replacing `<<FIELD>>` with the current field name (e.g., `bytes_in`, `bytes_out`), effectively converting all of them to megabytes in one line.'},
+                            {title: 'Concatenate User and Host Fields', code: '... \n| foreach local_user, remote_user [eval <<FIELD>> = <<FIELD>> . "@" . host]', explanation: 'This loop runs twice, once for `local_user` and once for `remote_user`. In each loop, it appends the host name to the user field, creating a fully-qualified user identity (e.g., "admin@server1").'}
+                        ]}
+                    ]
+                },
+                 {
+                    id: 'analytics-ml-commands', title: 'Advanced Analytics & ML', intro: 'Explore commands that provide more advanced analytical capabilities, including clustering, prediction, and anomaly detection, bringing machine learning concepts directly into your searches.',
+                    commands: [
+                         { name: 'cluster', purpose: 'Groups events that are similar in structure or content.', analysis: 'A powerful command for discovering patterns in your data without prior knowledge. It works by analyzing the "shape" of events. Use `showcount=t` to see how many events fall into each cluster. The `t` option allows you to control the similarity threshold (0 to 1).', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Group Similar Log Messages', code: 'index=firewall action=deny \n| cluster showcount=t', explanation: 'This command groups all firewall deny logs into clusters of similar messages. This can quickly reveal different types of deny rules being triggered, even if the specific IPs or ports are different.'}, 
+                            {title: 'Find Unusual Web Requests', code: 'index=web \n| cluster showcount=t \n| sort count', explanation: 'By clustering web logs and sorting by count ascending, you can find the most unusual or rare request types (clusters with only one or two events), which could indicate scanning or attack attempts.'} 
+                        ]},
+                        { name: 'anomalydetection', purpose: 'Identifies outliers or anomalous events in a time series.', analysis: 'A simpler alternative to building complex `streamstats` and `where` clauses. It automatically calculates expected ranges and flags deviations. The `action` can be `filter` (remove non-anomalies), `annotate` (add anomaly fields), or `report` (summarize anomalies).', tier: 'Transforming', examples: [
+                            {title: 'Find Anomalous Login Counts', code: 'index=auth action=login \n| timechart span=1h count as logins \n| anomalydetection logins', explanation: 'This first creates a timechart of hourly logins. `anomalydetection` then analyzes this series and identifies any hours where the login count was unusually high or low compared to the established pattern, adding fields like `is_anomaly` and `expected_value`.'},
+                            {title: 'Filter for Unusual Sales', code: 'index=sales \n| timechart span=1d sum(price) as daily_sales \n| anomalydetection daily_sales action=filter', explanation: 'This calculates total sales per day and then uses `anomalydetection` to pass through *only* the days where sales were determined to be anomalous. This is useful for feeding into an alert or a more detailed investigation.'}
+                        ]},
+                        { name: 'predict', purpose: 'Forecasts future values for a time series.', analysis: 'A powerful tool for capacity planning and trend analysis. It takes a time series from `timechart` as input and can use various algorithms (e.g., `LLP` for linear, `LLT` for seasonal). The `future_timespan` option determines how many time periods to predict into the future.', tier: 'Transforming', examples: [
+                            {title: 'Forecast Future CPU Usage', code: 'index=os host=appserver* \n| timechart span=1h avg(cpu) as avg_cpu \n| predict avg_cpu future_timespan=24', explanation: 'This query calculates the hourly average CPU for application servers, then uses the `predict` command to forecast the next 24 hours of CPU usage. The output will include fields like `prediction(avg_cpu)`, `upper95(prediction(avg_cpu))`, and `lower95(prediction(avg_cpu))`.'},
+                            {title: 'Predict Future Sales by Category', code: 'index=sales \n| timechart span=1d sum(price) as sales by category \n| predict sales', explanation: 'This demonstrates predicting multiple series at once. It creates a daily sales timechart split by category, and `predict` will generate a separate forecast for each product category.'}
+                        ]},
+                        { name: 'geostats', purpose: 'Generates statistics for geographic visualization on a map.', analysis: 'Used to aggregate data by geographic location. Requires fields for latitude and longitude. The `globallimit` option controls the number of distinct locations returned, while `bylimit` limits results per geographic bin. Essential for map visualizations.', tier: 'Transforming', examples: [
+                            {title: 'Map of Successful Logins', code: 'index=auth action=success \n| iplocation src_ip \n| geostats count by user', explanation: 'This query first uses `iplocation` to add geographic data (lat, lon) based on the `src_ip`. `geostats` then counts the number of successful logins, grouping them for display on a map, showing which users logged in from where.'},
+                            {title: 'Global Threat Map', code: 'index=firewall action=blocked \n| iplocation src_ip \n| geostats globallimit=0 sum(bytes) as total_bytes', explanation: 'This creates a map of blocked firewall traffic worldwide. It sums the total bytes blocked from each location. `globallimit=0` ensures all locations are included, not just the top N.'}
+                        ]}
+                    ]
+                },
+                {
+                    id: 'data-management-commands', title: 'Data Management & Enrichment', intro: 'This section covers commands used for data enrichment, correlation, and managing external data sources like lookup files. Mastering these commands allows you to build a richer, more complete analytical context.',
+                    commands: [
+                        { name: 'makeresults', purpose: 'A generating command that creates one or more empty events to start a search.', analysis: 'Essential for testing SPL logic without needing real data. It is also the foundation for searches that generate reports entirely from `eval` expressions or lookups, without using data from an index.', tier: 'Generating', examples: [
+                            {title: 'Testing an eval Expression', code: '| makeresults \n| eval test_data = "hello world" \n| eval new_field = upper(test_data)', explanation: 'This search starts by creating a single, empty event. It then uses `eval` to create a field `test_data` and a second `eval` to test the `upper()` function on that data. This is a fast way to prototype SPL logic.'},
+                            {title: 'Creating a Report from Scratch', code: '| makeresults count=3 \n| streamstats count as ID \n| eval user=case(ID=1, "alice", ID=2, "bob", ID=3, "charlie")', explanation: 'This creates three empty events. `streamstats` gives each one a unique ID (1, 2, 3). `eval` then uses this ID to create a table of user data from scratch, which could then be enriched with a lookup or used for other purposes.'}
+                        ]},
+                        { name: 'inputlookup', purpose: 'A generating command that loads search results from a specified lookup file.', analysis: 'The primary way to start a search using a CSV or KV Store lookup as the data source. Use `append=t` to append lookup data to existing results instead of replacing them.', tier: 'Generating', examples: [ 
+                            {title: 'Load a List of Servers', code: '| inputlookup servers.csv', explanation: 'This is a generating command that reads the `servers.csv` lookup file and uses its contents as the starting data for the search. Each row in the CSV becomes an event.'}, 
+                            {title: 'Append Threat Intel Data', code: 'index=mydata \n| inputlookup append=t threat_intel_ips.csv', explanation: 'The `append=t` argument makes `inputlookup` a streaming command. It takes the results from the previous command (from `index=mydata`) and appends the rows from the specified CSV file to them.'} 
+                        ]},
+                        { name: 'outputlookup', purpose: 'Writes search results to a specified lookup file (CSV or KV Store).', analysis: 'Essential for creating and updating lookup files based on search results. Use `create_empty=f` to avoid errors if the lookup already exists. The `append=t` option adds to the lookup instead of overwriting it.', tier: 'Streaming', examples: [ 
+                            {title: 'Create a New Lookup File', code: '... \n| stats count by user \n| outputlookup user_activity.csv', explanation: 'After a `stats` command calculates the activity count for each user, this command writes those results (the `user` and `count` columns) to a new file named `user_activity.csv`.'}, 
+                            {title: 'Append New Users to Existing Lookup', code: '... \n| fields user, full_name, department \n| outputlookup append=t all_users.csv', explanation: 'This takes the results of a search and appends them as new rows to the `all_users.csv` lookup file without deleting the existing contents, which is useful for incrementally building a lookup over time.'} 
+                        ]},
+                        { name: 'lookup', purpose: 'Enriches events with fields from an external source, like a CSV file.', analysis: 'The most performant and scalable method for data enrichment. Prefer this over `join` for adding static data. `OUTPUT` overwrites existing fields, `OUTPUTNEW` does not.', tier: 'Streaming', examples: [ 
+                            {title: 'Enrich with User Info', code: 'index=security_logs \n| lookup users.csv user_id OUTPUT full_name, department', explanation: 'For each event, this command takes the value in the `user_id` field, finds the matching row in `users.csv`, and adds the `full_name` and `department` fields from that lookup row to the event.'}, 
+                            {title: 'Enrich with Threat Intel', code: 'index=firewall \n| lookup threat_intel.csv src_ip OUTPUT is_malicious, threat_actor', explanation: 'This enriches firewall events by matching the `src_ip` with a threat intelligence lookup file, adding context like whether the IP is malicious and which threat actor it is associated with.'} 
+                        ]},
+                        { name: 'join', purpose: 'Combines results of a main search with results of a subsearch based on common fields.', analysis: 'Powerful but resource-intensive and often slow. Use as a last resort. Subsearch results should be smaller than main search results. `type` can be `inner` (default) or `left`. Prefer `stats` or `eventstats` if possible.', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Inner Join', code: 'index=sales \n| join type=inner transaction_id [search index=shipping]', explanation: 'This combines sales and shipping data. An `inner` join means it will only return events that have a matching `transaction_id` in *both* the sales data (main search) and the shipping data (subsearch).'}, 
+                            {title: 'Left Join to Find Missing Data', code: '| inputlookup servers.csv \n| join type=left server_name [search index=alerts] \n| fillnull value=0 count', explanation: 'A `left` join ensures that *all* results from the initial search (the server list) are kept. It then joins alert data where the `server_name` matches. If a server has no alerts, the alert fields will be null, which `fillnull` then changes to 0.'} 
+                        ]},
+                        { name: 'append', purpose: '"Stacks" results from a subsearch onto the results of the main search.', analysis: 'Does not merge rows; it unions them. Used to create a single list from multiple queries. Ensure field names are consistent between main and subsearch for proper alignment.', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Combine Logs from Two Environments', code: 'index=app_logs env=prod \n| append [search index=app_logs env=staging]', explanation: 'This command first gets all logs from the `prod` environment. It then runs the subsearch to get all logs from `staging` and adds them as new rows to the end of the `prod` results, creating one unified list.'}, 
+                            {title: 'Add a "Total" Row to a Report', code: '... \n| stats sum(sales) by product \n| append [| stats sum(sales) as sales | eval product="TOTAL"]', explanation: 'This search first calculates sales per product. The `append` command then runs a second search that calculates the grand total of all sales and gives it a `product` name of "TOTAL". This result is added as a final row to the main report.'} 
+                        ]},
+                        { name: 'appendcols', purpose: 'Appends the columns from a subsearch to the current results.', analysis: 'Adds the fields from the subsearch results as new columns. Only works reliably if the subsearch returns a single row of results; otherwise, it only uses the first row. Use `eventstats` for more robust solutions.', tier: 'Dataset Processing', examples: [
+                            {title: 'Add Overall Total to Each Row', code: '... \n| stats sum(sales) as sales by user \n| appendcols [search ... | stats sum(sales) as total_sales]', explanation: 'The main search gets sales by user. The subsearch calculates the single grand total of all sales. `appendcols` adds this `total_sales` value as a new column to every row of the main result set.'},
+                            {title: 'Combining Two Different Metrics', code: '| stats count(errors) as error_count \n| appendcols [search index=security | stats count as security_events]', explanation: 'This creates a single result with two columns. The first part calculates the `error_count`. `appendcols` then runs a completely separate search to get the `security_events` count and adds that value as a new column.'}
+                        ]},
+                        { name: 'transaction', purpose: 'Groups related raw events into a single, composite event.', analysis: 'Very powerful for sessionization but extremely resource-intensive. Use with caution. `maxspan` and `maxpause` are critical parameters to limit resource use. Often, `stats` with `values()` and `earliest()`/`latest()` is a much faster alternative.', tier: 'Transforming', examples: [ 
+                            {title: 'Basic Web Sessionization', code: 'index=web \n| transaction clientip maxspan=30m', explanation: 'This command groups events by the `clientip` field. It starts a new transaction whenever a new `clientip` is seen, or if the time between events from the same IP exceeds 30 minutes (`maxspan`).'}, 
+                            {title: 'Define Purchase Funnel', code: 'index=web \n| transaction session_id startswith="view_cart" endswith="purchase_confirmation"', explanation: 'This creates a transaction that begins with an event containing "view_cart" and ends with one containing "purchase_confirmation", but only for events sharing the same `session_id`.'} 
+                        ]},
+                    ]
+                },
+                {
+                    id: 'admin-commands', title: 'Administration & Monitoring', intro: 'This section is for Splunk Admins and Power Users. These commands allow you to inspect Splunk\'s internal state, manage configurations, monitor performance, and audit user activity.',
+                    commands: [
+                        { name: 'rest', purpose: 'Queries a Splunk REST API endpoint directly from the search bar.', analysis: 'Extremely powerful for introspection and programmatic management of a Splunk environment. Can be used to check search job status, configuration details, health info, and more. Requires admin or equivalent privileges for many endpoints.', tier: 'Generating', examples: [ 
+                            {title: 'List Saved Searches in an App', code: '| rest /servicesNS/nobody/search/saved/searches', explanation: 'This command queries the REST endpoint for saved searches within the context of the "search" app and the "nobody" user, listing all globally shared saved searches.'}, 
+                            {title: 'Check Splunkd Health Status', code: '| rest /services/server/health/splunkd \n| mvexpand splunk_health_features \n| spath input=splunk_health_features', explanation: 'This retrieves the health report for the splunkd process. `mvexpand` and `spath` are used to format the complex XML/JSON response into a readable table showing the status of each feature.'} 
+                        ]},
+                        { name: 'dbinspect', purpose: 'Returns metadata about the buckets of a specified index.', analysis: 'Essential for troubleshooting indexing performance, disk space usage, and data retention policies. Shows bucket size, event count, time ranges, and whether a bucket is hot, warm, cold, or frozen. Must be the first command in a search.', tier: 'Generating', examples: [
+                            {title: 'Inspect a Specific Index', code: '| dbinspect index=main', explanation: 'This returns a detailed list of every bucket in the "main" index, along with its current state, size, and other metadata.'},
+                            {title: 'Find Large or Old Buckets', code: '| dbinspect index=web \n| where sizeOnDiskMB > 1024 OR endEpoch < relative_time(now(), "-30d")', explanation: 'This helps admins find buckets that are either larger than 1GB (potential rolling issues) or contain no data from the last 30 days (potential retention issues).'}
+                        ]},
+                        { name: 'metadata', purpose: 'Returns a list of sources, sourcetypes, or hosts from a specific index or distributed environment.', analysis: 'Critical for data quality audits, validating data onboarding, and understanding what data is present in your environment. Shows total event count, first time seen, last time seen, and most recent time seen.', tier: 'Generating', examples: [
+                            {title: 'List all Sourcetypes in an Index', code: '| metadata type=sourcetypes index=os', explanation: 'This quickly generates a report of every sourcetype present in the "os" index, along with its event count and the time range of its data.'},
+                            {title: 'Find Hosts That Have Gone Silent', code: '| metadata type=hosts index=* \n| eval age = now() - recentTime \n| where age > 3600 \n| convert ctime(recentTime)', explanation: 'This powerful admin search finds all hosts that have not sent any data in the last hour (`age > 3600` seconds). `convert ctime` makes the timestamp human-readable.'}
+                        ]},
+                        { name: 'set', purpose: 'Performs set operations (union, intersect, diff) on the results of two subsearches.', analysis: 'A highly efficient way to compare two lists of values, such as users or hosts. `diff` is particularly useful for finding exceptions. Much faster than `join` for simple membership comparisons.', tier: 'Dataset Processing', examples: [
+                            {title: 'Find Privileged Users Not in VPN Group (Difference)', code: '| set diff [| inputlookup privileged_users.csv | fields user] [search index=vpn sourcetype=vpn_login | dedup user | fields user]', explanation: 'This finds users who are on the privileged access list but have not logged into the VPN, which may be a security policy violation. The first subsearch gets the master list, the second gets the VPN users, and `diff` finds what is in the first set but not the second.'},
+                            {title: 'Find Users in Both Security and Admin Groups (Intersection)', code: '| set intersect [search group=security | dedup user | fields user] [search group=admin | dedup user | fields user]', explanation: 'This finds users that are members of both the "security" and "admin" groups, which could be useful for auditing roles with overlapping, powerful permissions.'}
+                        ]},
+                        { name: 'audit', purpose: 'A generating command that is a shortcut to search the `_audit` index.', analysis: 'Simplifies searching the audit trail, which is crucial for compliance and security monitoring. The _audit index logs user actions, search queries run, configuration changes, and other internal Splunk events.', tier: 'Generating', examples: [ 
+                            {title: 'Find All Searches Run by a User', code: '| audit | search user="admin" action="search" info="granted"', explanation: 'This command searches the audit trail for all searches successfully executed (`info="granted"`) by the "admin" user.'}, 
+                            {title: 'Monitor for Failed Login Attempts', code: '| audit action="login attempt" info="failed" \n| stats count by user, app', explanation: 'This creates a report of failed login attempts to the Splunk UI or API, tallied by the user account and the application they tried to access.'} 
+                        ]},
+                        { name: 'collect', purpose: 'Adds the results of a search to a summary index.', analysis: 'A powerful admin command for long-term data summarization and performance optimization. Searches against smaller summary indexes are much faster than against raw event indexes. Requires the destination summary index to exist.', tier: 'Streaming', examples: [ 
+                            {title: 'Summarize Daily Sales', code: 'index=sales sourcetype=tx | stats sum(amount) as daily_revenue by category | collect index=sales_summary', explanation: 'This query calculates the daily sales revenue by category and then saves this much smaller, aggregated result into the `sales_summary` index for fast future reporting.'}, 
+                            {title: 'Add Metadata to Summary Event', code: '| makeresults | eval info_search_name="Daily User Count" | collect index=summary_info addinfo=t', explanation: 'The `addinfo=t` parameter automatically adds metadata about the search (like search name, app context, user) to the event being collected, which is useful for auditing summary index creation.'} 
+                        ]},
+                        { name: 'loadjob', purpose: 'Loads events from a previously run search job.', analysis: 'Extremely useful for debugging, chaining complex workflows, or accessing results of a search that took a long time to run without re-executing it. Requires the SID (Search ID) of the job, which must not have expired.', tier: 'Generating', examples: [ 
+                            {title: 'Load a Specific Job', code: '| loadjob 1463434857.356', explanation: 'Loads the results from the search job with the specified SID. The user who runs `loadjob` must have permission to view the job.'}, 
+                            {title: 'Further Analyze a Saved Job', code: '| loadjob "admin__admin__search__RMD5d3630461b14115c5_1463434857.356" \n| search user=bob', explanation: 'Loads the results from a dispatched, persistent search job and then performs additional filtering on them, in this case finding events related to the user "bob".'} 
+                        ]}
+                    ]
+                },
+                {
+                    id: 'performance-commands', title: 'Performance & Advanced Search', intro: 'When speed is paramount, especially on massive datasets, these commands provide unique capabilities. They enable you to query data models, leverage indexed metadata, and perform complex iterative logic.',
+                    commands: [
+                        { name: 'tstats', purpose: 'A high-performance command that runs statistical queries against indexed metadata, not raw data.', analysis: 'Orders of magnitude faster than `stats`. Can only operate on index-time fields or fields in an accelerated data model. This is a generating command and must be first in the pipeline. Use `summariesonly=t` to ensure you only use accelerated data.', tier: 'Generating', examples: [ 
+                            {title: 'Fast Count on Indexed Fields', code: '| tstats count WHERE index=* by sourcetype', explanation: 'This command provides a very fast count of all events, grouped by `sourcetype`, across all indexes. It works quickly because it reads from the small index metadata files (.tsidx), not the large raw data files.'}, 
+                            {title: 'Query an Accelerated Data Model', code: '| tstats summariesonly=t count FROM datamodel=Authentication WHERE nodename=Failed_Authentication by user', explanation: 'This query runs against a pre-calculated, accelerated data model for Authentication. `summariesonly=t` ensures it only uses the fast summary data. It gets a count of failed authentications grouped by user.'} 
+                        ]},
+                        { name: 'mstats', purpose: 'A high-performance command for running statistical queries on metrics data.', analysis: 'The metric-equivalent of `tstats`. Must be used on metric indexes. Much faster than running `search` against metric data.', tier: 'Generating', examples: [
+                           {title: 'Average CPU per Metric Name', code: '| mstats avg(_value) WHERE metric_name=*.cpu.percent by metric_name span=30s', explanation: 'This query calculates the average of all metrics ending in `cpu.percent`, grouped by the full metric name, in 30-second spans.'}
+                        ]},
+                        { name: 'datamodel', purpose: 'A generating command to search a specific dataset within a data model.', analysis: 'Provides a CIM-compliant way to query data without knowing the underlying index or sourcetype. Much simpler than `tstats` but less performant. Excellent for ensuring searches work across different data sources that conform to the same model.', tier: 'Generating', examples: [
+                            {title: 'Query Network Traffic Data Model', code: '| datamodel Network_Traffic All_Traffic search \n| stats count by src_ip', explanation: 'This is a generating command that searches the "All_Traffic" dataset within the "Network_Traffic" data model. It provides a standardized way to get network data without needing to know the specific index or sourcetype.'}, 
+                            {title: 'Find Web Events by Action', code: '| datamodel Web Web search action=purchase \n| table user, url, price', explanation: 'This query uses the "Web" data model to find all events representing a purchase action. This allows for CIM-compliant searching across potentially many different kinds of web log sources.'}
+                        ]},
+                        { name: 'subsearch', purpose: 'A search nested in `[]` whose results are used as an argument for the outer search.', analysis: 'Subsearch runs first. Its results are formatted into a large `OR` expression (e.g., `(field="a" OR field="b")`). Subject to limits on results and runtime. Use `format` command within subsearch for more control.', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Filter with a Dynamic List', code: 'index=firewall [search index=ids earliest=-1h | dedup src_ip | fields src_ip]', explanation: 'The subsearch (in brackets) runs first: it gets a unique list of `src_ip` values from IDS alerts in the last hour. This list is then passed to the outer search, which finds all firewall events matching those specific IPs.'}, 
+                            {title: 'Exclusionary Analysis (NOT IN)', code: '| inputlookup admin_users.csv \n| search NOT [search index=auth earliest=-90d | dedup user | fields user]', explanation: 'This finds admin users who have *not* logged in recently. The subsearch finds all users who *have* logged in. The main search then takes the full list of admins and excludes anyone found by the subsearch.'} 
+                        ]},
+                        { name: 'map', purpose: 'Executes a subsearch for each individual result from the main search (a foreach loop).', analysis: 'Powerful for iterative correlation but "risky" as it can trigger many concurrent searches. Use `maxsearches` to limit impact. Substitute outer fields into the inner search with `$field_name$`. Often much slower than `join` or `stats`.', tier: 'Dataset Processing', examples: [ 
+                            {title: 'Iterative Lookup', code: 'index=linux "sudo: " \n| dedup user \n| map search="search index=ad user=$user$ | head 1"', explanation: 'This command first gets a list of unique users who have used `sudo`. Then, for each of those users, the `map` command runs a separate search to find their information in the Active Directory (`ad`) index. The `$user$` token substitutes the username from the main search into the subsearch.'}, 
+                            {title: 'Dynamic Time-Window Analysis', code: 'index=app "crash" \n| map search="search index=app host=$host$ earliest=$T-600$ latest=$T$ error"', explanation: 'For each event with "crash", this runs a separate search for "error" events on the same host (`$host$`) in the 10 minutes (`$T-600$`) leading up to the crash. `$T$` represents the timestamp of the crash event from the outer search.'} 
+                        ]},
+                        { name: 'concurrency', purpose: 'Measures the number of events that are "in-flight" or overlapping at any given time.', analysis: 'Powerful for capacity, license, and session limit analysis. Requires events to have a start time and a duration. Can also work with explicit start and end events.', tier: 'Transforming', examples: [ 
+                            {title: 'Concurrent VPN Sessions', code: 'index=vpn \n| transaction user startswith="session_started" endswith="session_ended" \n| concurrency duration=duration', explanation: 'First, `transaction` groups start and end events for each user session and calculates the `duration`. Then, `concurrency` analyzes these transactions to determine the maximum number of simultaneous VPN sessions that were active at any point.'}, 
+                            {title: 'Concurrent API Calls', code: 'index=api sourcetype=api_log \n| concurrency duration=response_time', explanation: 'Assuming each API log event has a `response_time` field representing its duration, this command calculates how many API calls were being processed concurrently, helping to identify performance bottlenecks.'} 
+                        ]},
+                    ]
+                },
+                {
+                    id: 'reference-section', title: 'Quick Reference', intro: 'This section contains quick-reference tables for common functions, format codes, and regular expressions, adapted from the official Splunk Quick Reference Guide.',
+                    content: '...' // Populated below
+                },
+                {
+                    id: 'complex-scenarios',
+                    title: 'Complex Scenarios & Queries',
+                    intro: 'This section moves beyond individual commands to demonstrate how to architect advanced queries that solve real-world problems. These examples showcase how to combine multiple commands into a logical pipeline to generate sophisticated insights.',
+                    scenarios: [
+                        {
+                            title: 'Scenario 1: Investigating a Slow Web Application',
+                            description: 'An application owner reports that users are experiencing slow page load times. The goal is to identify which specific pages are slow and determine if the issue is isolated to certain servers or users.',
+                            query: 'index=web sourcetype=access_combined status=200 action=purchase\n| bin _time span=5m\n| stats avg(response_time) as avg_response, max(response_time) as max_response, p95(response_time) as p95_response by uri_path, host\n| eventstats avg(p95_response) as global_p95_avg by uri_path\n| where p95_response > (global_p95_avg * 2)\n| rename uri_path as "Page Path", host as "Responding Server", p95_response as "95th Percentile Response (ms)", global_p95_avg as "Average 95th Percentile for this Page"',
+                            explanation: 'This query provides a multi-faceted view of application performance.\n<br><strong>1. `bin`</strong>: First, we group events into 5-minute buckets to smooth out temporary spikes.\n<br><strong>2. `stats`</strong>: We calculate the average, max, and 95th percentile response time for each unique page (\'uri_path\') and \'host\'. The 95th percentile is often more useful than average as it ignores extreme outliers but still shows what a "typically slow" experience is.\n<br><strong>3. `eventstats`</strong>: This is the key step for advanced comparison. For each page, it calculates the *average 95th percentile response time across all servers* and adds this value (\'global_p95_avg\') to every row for that page.\n<br><strong>4. `where`</strong>: Now we can compare a specific server\'s performance for a page against the norm for that same page. We filter for results where a server\'s 95th percentile response time is more than double the global average for that page, immediately highlighting underperforming servers.\n<br><strong>5. `rename`</strong>: Finally, we give the fields clear, human-readable names for the report.'
+                        },
+                        {
+                            title: 'Scenario 2: Correlating Security Events for Threat Hunting',
+                            description: 'A threat analyst needs to find suspicious activity where a user from a known bad IP address logs in and then accesses a sensitive file server shortly after. This requires correlating data from firewall, authentication, and file server logs.',
+                            query: 'index=pan_logs sourcetype=pan:traffic [| inputlookup known_bad_ips.csv | fields src_ip]\n| rename src_ip as suspicious_ip\n| stats earliest(_time) as first_fw_time, latest(_time) as last_fw_time by user, suspicious_ip\n| join user [\n    search index=windows sourcetype=wineventlog EventCode=4624 user=*\n    | stats earliest(_time) as login_time by user\n]\n| join user [\n    search index=fileserver sourcetype=fs_access action=read\n    | stats earliest(_time) as file_access_time, values(file_name) as accessed_files by user\n]\n| where login_time > first_fw_time AND file_access_time > login_time\n| table user, suspicious_ip, first_fw_time, login_time, file_access_time, accessed_files',
+                            explanation: 'This advanced threat hunt stitches together three different data sources.\n<br><strong>1. Subsearch & First `stats`</strong>: The query begins by finding all firewall traffic involving IPs from a threat intelligence lookup (\'known_bad_ips.csv\'). It then uses \'stats\' to find the first time each \'user\' was seen coming from a \'suspicious_ip\'.\n<br><strong>2. First `join`</strong>: The results are then joined by \'user\' to Windows authentication logs (\'EventCode=4624\' is a successful login). This adds the \'login_time\' to any user who successfully logged in.\n<br><strong>3. Second `join`</strong>: A second join on \'user\' correlates the data with file server access logs, adding the time of the first file access and a list of all files they read.\n<br><strong>4. `where`</strong>: The final \'where\' clause is the crucial correlation step. It filters for timelines where the login happened *after* the first firewall activity from the bad IP, AND the file access happened *after* the login, confirming the logical attack chain.\n<br><strong>5. `table`</strong>: The final table presents a clear summary of the correlated attack path for the analyst.'
+                        },
+                        {
+                            title: 'Scenario 3: IT Ops - Root Cause Analysis of Application Errors',
+                            description: 'Users report a spike in application errors. The goal is to determine if these errors correlate with a spike in CPU utilization on the supporting servers, and identify which servers are affected.',
+                            query: 'index=app sourcetype=app_errors "level=ERROR"\n| bin _time span=1m\n| stats count as error_count by _time, host\n| join _time, host [\n    search index=os sourcetype=cpu\n    | bin _time span=1m\n    | stats avg(pct_cpu) as avg_cpu by _time, host\n]\n| where error_count > 10 AND avg_cpu > 90\n| timechart span=1m sum(error_count) by host',
+                            explanation: 'This query combines application and OS data to find a potential root cause for errors.\n<br><strong>1. Main Search & `stats`</strong>: First, we find all application error events, bucket them into 1-minute intervals, and count the errors per minute for each host.\n<br><strong>2. `join` with Subsearch</strong>: We use a `join` to correlate our error data with OS data. The subsearch gets CPU metrics from the OS index, also bucketed by 1 minute, and calculates the average CPU for each host in that minute.\nThe join combines these two data streams where both the `_time` bucket and `host` match.\n<br><strong>3. `where`</strong>: This clause filters our combined data to find the "smoking gun": time windows where the error count for a host was high ( > 10) AND the average CPU on that same host was also high ( > 90%).\n<br><strong>4. `timechart`</strong>: Finally, we visualize the results, plotting the number of errors over time for only the hosts that met our `where` clause criteria. This provides a clear chart showing which hosts had CPU-related error spikes.'
+                        }
+                    ]
+                },
+                {
+                    id: 'optimization', title: 'Best Practices & Optimization', intro: 'Mastering SPL is not just about memorizing syntax, but in internalizing a set of core principles that guide the construction of every search. Professional SPL is defined by its efficiency. A well-structured query respects the processing pipeline and minimizes work at every stage.',
+                    content: '...' // Populated below
+                },
+            ]
+        };
+
+        // Fill in fundamentals content
+        splData.sections.find(s => s.id === 'fundamentals').content =
+            '<div class="space-y-12">' +
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">The Pipelined Language</h3>' +
+                    '<p class="mb-4">SPL is a pipelined language where data flows from one command to the next using the pipe character (|). Each command transforms the data it receives. The key to performance is to filter data as early as possible in the pipeline.</p>' +
+                    '<div class="bg-slate-200 dark:bg-slate-800/50 p-4 rounded-lg">' +
+                        '<h4 class="font-semibold text-slate-700 dark:text-slate-300 mb-3 text-center">Conceptual Data Pipeline</h4>' +
+                        '<div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-2">' +
+                            '<div class="pipeline-step bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-center w-full md:w-auto"><div class="text-sm font-semibold text-green-600 dark:text-green-400">Step 1: Generate</div><div class="text-xs text-slate-500 dark:text-slate-400">Raw Events from Index</div></div>' +
+                            '<div class="text-2xl text-slate-400 dark:text-slate-500 font-mono">&rarr;</div>' +
+                            '<div class="pipeline-step bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-center w-full md:w-auto"><div class="text-sm font-semibold text-green-600 dark:text-green-400">Step 2: Stream & Filter</div><div class="text-xs text-slate-500 dark:text-slate-400">Commands like \'where\', \'rex\'</div></div>' +
+                            '<div class="text-2xl text-slate-400 dark:text-slate-500 font-mono">&rarr;</div>' +
+                            '<div class="pipeline-step bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-center w-full md:w-auto"><div class="text-sm font-semibold text-amber-600 dark:text-amber-400">Step 3: Transform</div><div class="text-xs text-slate-500 dark:text-slate-400">Commands like \'stats\', \'chart\'</div></div>' +
+                            '<div class="text-2xl text-slate-400 dark:text-slate-500 font-mono">&rarr;</div>' +
+                            '<div class="pipeline-step bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-center w-full md:w-auto"><div class="text-sm font-semibold text-rose-600 dark:text-rose-400">Step 4: Output</div><div class="text-xs text-slate-500 dark:text-slate-400">Table, Visualization</div></div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Core Splunk Components</h3>' +
+                    '<p class="mb-4">A Splunk environment is made of several key components working together.</p>' +
+                    '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Forwarder</h4><p class="text-sm text-slate-600 dark:text-slate-400 mt-1">A Splunk instance that consumes and sends data to another Splunk instance (usually an Indexer). Resides on the machines where the data originates.</p></div>' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Indexer</h4><p class="text-sm text-slate-600 dark:text-slate-400 mt-1">The workhorse. It receives, parses, and stores incoming data into indexes. It also handles search requests, retrieving the data from disk.</p></div>' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Search Head</h4><p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Provides the user interface for searching. It distributes search requests to Indexers and merges the results back to the user.</p></div>' +
+                    '</div>' +
+                '</div>' +
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Using Time Modifiers</h3>' +
+                    '<p class="mb-4">You can specify the time range of your search using the `earliest` and `latest` modifiers. The format is `[+|-]<integer><unit>@<snap_time_unit>`.</p>' +
+                    '<pre class="bg-slate-900 text-slate-200 text-sm rounded-md p-4 overflow-x-auto"><code>sourcetype=access_combined error earliest=-1d@d latest=-h@h</code></pre>' +
+                    '<p class="text-sm text-slate-600 dark:text-slate-400 mt-2">This search retrieves events containing "error" that occurred yesterday (snapping to the beginning of the day at 00:00:00) through the start of the current hour.</p>' +
+                '</div>' +
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Command Processing Tiers</h3>' +
+                    '<p class="mb-4">SPL commands are classified by how they process data, which dictates their performance. This chart is generated dynamically from the command list, showing the real distribution of command types in this guide.</p>' +
+                    '<div class="bg-white dark:bg-slate-950 p-4 rounded-lg shadow-md"><div class="chart-container"><canvas id="commandTypesChart"></canvas></div></div>' +
+                '</div>' +
+            '</div>';
+
+        // Fill in quick reference content
+        splData.sections.find(s => s.id === 'reference-section').content =
+            '<div class="space-y-12">' +
+                // Eval Functions Table
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-4">Common Eval Functions</h3>' +
+                    '<div class="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden">' +
+                        '<table class="min-w-full text-sm">' +
+                            '<thead class="bg-slate-100 dark:bg-slate-700"><tr class="text-left text-slate-600 dark:text-slate-300 font-semibold"><th>Function</th><th>Description</th></tr></thead>' +
+                            '<tbody class="divide-y divide-slate-200 dark:divide-slate-700">' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>case(X, "Y", ...)</code></td><td>Returns Y for the first expression X that is TRUE.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>cidrmatch("X", Y)</code></td><td>Checks if an IP address Y belongs to a subnet X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>coalesce(X, ...)</code></td><td>Returns the first value that is not null.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>if(X, Y, Z)</code></td><td>If X is TRUE, returns Y, else returns Z.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>in(field, ...)</code></td><td>Checks if a field value is present in a list of strings.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>len(X)</code></td><td>Returns the character length of string X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>like(X, "Y")</code></td><td>Returns TRUE if string X matches the pattern Y.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>match(X, "Y")</code></td><td>Returns TRUE if string X matches the regex pattern Y.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>mvcount(X)</code></td><td>Returns the number of values in a multi-valued field X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>mvfilter(X)</code></td><td>Filters a multi-valued field using a boolean expression X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>now()</code></td><td>Returns the current time as a Unix epoch value.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>random()</code></td><td>Returns a random number from 0 to 2147483647.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>relative_time(X,Y)</code></td><td>Applies a relative time specifier Y to an epoch time X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>replace(X,Y,Z)</code></td><td>Replaces occurrences of regex Y with string Z in string X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>round(X, Y)</code></td><td>Rounds number X to Y decimal places.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>split(X, "Y")</code></td><td>Splits string X into a multi-valued field using delimiter Y.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>strftime(X, "Y")</code></td><td>Formats an epoch time X using a time format string Y.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>strptime(X, "Y")</code></td><td>Converts a time string X into epoch time using format Y.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>tostring(X, "Y")</code></td><td>Converts value X to a string. Y can be "hex", "commas", or "duration".</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>typeof(X)</code></td><td>Returns the type of the value X (e.g., "string", "number").</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>urldecode(X)</code></td><td>Decodes a URL-encoded string X.</td></tr>' +
+                            '</tbody>' +
+                        '</table>' +
+                    '</div>' +
+                '</div>' +
+                // Stats Functions Table
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-4">Common Stats Functions</h3>' +
+                    '<div class="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden">' +
+                        '<table class="min-w-full text-sm">' +
+                           '<thead class="bg-slate-100 dark:bg-slate-700"><tr class="text-left text-slate-600 dark:text-slate-300 font-semibold"><th>Function</th><th>Description</th></tr></thead>' +
+                            '<tbody class="divide-y divide-slate-200 dark:divide-slate-700">' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>avg(X)</code></td><td>Returns the average of the values of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>count(X)</code></td><td>Returns the number of occurrences of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>dc(X)</code></td><td>Returns the distinct count of field X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>earliest(X)</code></td><td>Returns the chronologically earliest value of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>latest(X)</code></td><td>Returns the chronologically latest value of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>max(X)</code></td><td>Returns the maximum value of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>median(X)</code></td><td>Returns the middle-most value of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>min(X)</code></td><td>Returns the minimum value of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>mode(X)</code></td><td>Returns the most frequent value of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>perc&lt;X&gt;(Y)</code></td><td>Returns the X-th percentile of field Y (e.g., `perc95(response_time)`).</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>range(X)</code></td><td>Returns the difference between the max and min of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>stdev(X)</code></td><td>Returns the sample standard deviation of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>sum(X)</code></td><td>Returns the sum of the values of X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>values(X)</code></td><td>Returns the list of unique values of field X.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>var(X)</code></td><td>Returns the sample variance of field X.</td></tr>' +
+                            '</tbody>' +
+                        '</table>' +
+                    '</div>' +
+                '</div>' +
+                 // Date/Time Format Table
+                '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-4">Date & Time Format Codes (for strftime/strptime)</h3>' +
+                    '<div class="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden">' +
+                        '<table class="min-w-full text-sm">' +
+                           '<thead class="bg-slate-100 dark:bg-slate-700"><tr class="text-left text-slate-600 dark:text-slate-300 font-semibold"><th>Code</th><th>Description</th><th>Example</th></tr></thead>' +
+                            '<tbody class="divide-y divide-slate-200 dark:divide-slate-700">' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%Y</code></td><td>Year with century</td><td>2025</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%y</code></td><td>Year without century</td><td>25</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%m</code></td><td>Month number (01-12)</td><td>06</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%B</code></td><td>Full month name</td><td>June</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%b</code></td><td>Abbreviated month name</td><td>Jun</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%d</code></td><td>Day of month (01-31)</td><td>25</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%A</code></td><td>Full weekday name</td><td>Wednesday</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%a</code></td><td>Abbreviated weekday</td><td>Wed</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%H</code></td><td>24-hour (00-23)</td><td>19</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%I</code></td><td>12-hour (01-12)</td><td>07</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%M</code></td><td>Minute (00-59)</td><td>48</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%S</code></td><td>Second (00-61)</td><td>05</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%p</code></td><td>AM or PM</td><td>PM</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%Z</code></td><td>Time zone name</td><td>EST</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>%z</code></td><td>Time zone offset</td><td>-0500</td></tr>' +
+                            '</tbody>' +
+                        '</table>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        
+        // Fill in optimization/best practices content
+        splData.sections.find(s => s.id === 'optimization').content = 
+            '<div class="space-y-6">' +
+            '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-md border-l-4 border-primary-500"><h4 class="font-bold text-lg text-slate-800 dark:text-slate-200">1. Filter Early and Be Specific</h4><p>The most critical optimization. Reduce the dataset as early as possible. Always specify the shortest effective time range. Filter on indexed fields like <code>index</code>, <code>sourcetype</code>, and <code>host</code> at the very beginning of your search.</p></div>' +
+            '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-md border-l-4 border-emerald-500"><h4 class="font-bold text-lg text-slate-800 dark:text-slate-200">2. Use Streaming Commands Before Transforming Commands</h4><p>Perform all possible filtering and data manipulation with streaming commands (<code>where</code>, <code>eval</code>, <code>rex</code>, `fields`) before invoking expensive transforming commands like <code>stats</code>, <code>chart</code>, or <code>timechart</code> which must process the entire result set.</p></div>' +
+            '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-md border-l-4 border-amber-500"><h4 class="font-bold text-lg text-slate-800 dark:text-slate-200">3. Project Only the Fields You Need</h4><p>After extracting fields, explicitly remove large, unnecessary fields—especially <code>_raw</code>—from the pipeline using the <code>| fields - _raw</code> command. This dramatically reduces the memory footprint and speeds up all downstream processing.</p></div>' +
+            '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-md border-l-4 border-violet-500"><h4 class="font-bold text-lg text-slate-800 dark:text-slate-200">4. Choose the Smartest Correlation Method</h4><p>Approach data enrichment with a performance-first mindset. For adding static data, <strong>lookup</strong> is best. For aggregating related events, <strong>stats</strong> is best. Use the resource-intensive <strong>join</strong> and <strong>transaction</strong> commands only when their unique capabilities are absolutely necessary.</p></div>' +
+            '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-md border-l-4 border-rose-500"><h4 class="font-bold text-lg text-slate-800 dark:text-slate-200">5. Avoid Inefficient Regex</h4><p>When using `rex`, avoid leading wildcards in your regular expressions (e.g., `.*foo`). Be as specific as possible. A well-crafted regex is much faster than a lazy one.</p></div>' +
+            '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-md border-l-4 border-sky-500"><h4 class="font-bold text-lg text-slate-800 dark:text-slate-200">6. Leverage `tstats` for High-Performance Counts</h4><p>For statistical queries on massive datasets, `tstats` is orders of magnitude faster than `stats`. It queries indexed metadata, not raw data. This requires planning at data onboarding to ensure relevant fields are indexed or in an accelerated data model, but the performance gain is immense.</p></div>' +
+            '</div>';
+
+        const contentContainer = document.getElementById('content-container');
+        const navigation = document.getElementById('navigation');
+        const commandSearch = document.getElementById('commandSearch');
+        let commandChartInstance = null;
+        let animationObserver = null;
+
+        function renderContent() {
+            let html = '';
+            const query = commandSearch.value.toLowerCase().trim();
+
+            splData.sections.forEach(section => {
+                let sectionContent = '';
+                let hasContent = false;
+                
+                if (section.commands) {
+                    const filteredCommands = section.commands.filter(cmd => 
+                        query === '' ||
+                        cmd.name.toLowerCase().includes(query) ||
+                        cmd.purpose.toLowerCase().includes(query) ||
+                        cmd.analysis.toLowerCase().includes(query)
+                    );
+                    
+                    if (filteredCommands.length > 0) {
+                        hasContent = true;
+                        sectionContent += '<div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">';
+                        filteredCommands.forEach(cmd => {
+                            sectionContent += 
+                                '<div class="card-animate bg-white dark:bg-slate-800 rounded-xl shadow-lg dark:shadow-slate-900/50 p-6 flex flex-col border-t-4 border-primary-500">' +
+                                    '<h4 class="text-xl font-bold text-slate-800 dark:text-slate-200 font-mono">' + cmd.name + '</h4>' +
+                                    '<p class="text-sm text-slate-600 dark:text-slate-400 mt-2 flex-grow">' + cmd.purpose + '</p>' +
+                                    '<div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">' +
+                                        '<h5 class="font-semibold text-slate-700 dark:text-slate-300 text-sm mb-2">Expert Analysis</h5>' +
+                                        '<p class="text-xs text-slate-500 dark:text-slate-400">' + cmd.analysis + '</p>' +
+                                    '</div>' +
+                                    '<div class="mt-4">' +
+                                        '<h5 class="font-semibold text-slate-700 dark:text-slate-300 text-sm mb-2">Examples</h5>' +
+                                        '<div class="space-y-4">' +
+                                            cmd.examples.map(function(ex) { 
+                                                return '<div>' +
+                                                    '<p class="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">' + ex.title + '</p>' +
+                                                    '<div class="relative group">' +
+                                                        '<pre class="bg-slate-900 text-slate-200 text-xs rounded-md p-3 overflow-x-auto"><code>' + ex.code + '</code></pre>' +
+                                                        '<button class="copy-btn absolute top-2 right-2 bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100" data-code="' + ex.code.replace(/"/g, '&quot;') + '">Copy</button>' +
+                                                    '</div>' +
+                                                    '<p class="text-xs text-slate-600 dark:text-slate-500 mt-2 bg-slate-100 dark:bg-slate-700/50 p-2 rounded-md">' + ex.explanation + '</p>' +
+                                                '</div>'
+                                            }).join('') +
+                                        '</div>' +
+                                    '</div>' +
+                                '</div>';
+                        });
+                        sectionContent += '</div>';
+                    }
+                } else if (section.scenarios) {
+                     const filteredScenarios = section.scenarios.filter(sc => 
+                        query === '' ||
+                        sc.title.toLowerCase().includes(query) ||
+                        sc.description.toLowerCase().includes(query) ||
+                        sc.query.toLowerCase().includes(query)
+                    );
+                     if (filteredScenarios.length > 0) {
+                        hasContent = true;
+                        sectionContent += '<div class="space-y-8">';
+                        filteredScenarios.forEach(sc => {
+                             sectionContent += 
+                                '<div class="card-animate bg-white dark:bg-slate-800 rounded-xl shadow-lg dark:shadow-slate-900/50 p-6 flex flex-col border-t-4 border-emerald-500">' +
+                                    '<h4 class="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">' + sc.title + '</h4>' +
+                                    '<p class="text-sm text-slate-600 dark:text-slate-400 mb-4">' + sc.description + '</p>' +
+                                    '<div class="mt-4">' +
+                                        '<h5 class="font-semibold text-slate-700 dark:text-slate-300 text-sm mb-2">Query</h5>' +
+                                        '<div class="relative group">' +
+                                            '<pre class="bg-slate-900 text-slate-200 text-xs rounded-md p-3 overflow-x-auto"><code>' + sc.query + '</code></pre>' +
+                                            '<button class="copy-btn absolute top-2 right-2 bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100" data-code="' + sc.query.replace(/"/g, '&quot;') + '">Copy</button>' +
+                                        '</div>' +
+                                    '</div>' +
+                                    '<div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">' +
+                                        '<h5 class="font-semibold text-slate-700 dark:text-slate-300 text-sm mb-2">Explanation</h5>' +
+                                        '<p class="text-xs text-slate-600 dark:text-slate-500 leading-relaxed">' + sc.explanation + '</p>' +
+                                    '</div>' +
+                                '</div>';
+                        });
+                        sectionContent += '</div>';
+                     }
+                } else if (section.content && (query === '' || section.title.toLowerCase().includes(query))) {
+                    hasContent = true;
+                    sectionContent = section.content;
+                }
+
+                if (hasContent) {
+                    html += 
+                        '<section id="' + section.id + '" class="mb-16 min-h-[5rem]">' +
+                            '<h2 class="text-3xl font-bold text-green-500 dark:text-green-400 border-b-2 border-green-500 dark:border-green-400 pb-2 mb-4">' + section.title + '</h2>' +
+                            '<p class="text-slate-600 dark:text-slate-400 mb-8 max-w-4xl">' + section.intro + '</p>' +
+                            sectionContent +
+                        '</section>';
+                }
+            });
+            contentContainer.innerHTML = html;
+            
+            if (contentContainer.innerHTML === '' && query !== '') {
+                contentContainer.innerHTML = '<div class="text-center py-16"><h3 class="text-2xl font-bold dark:text-slate-200">No results found for "' + query + '"</h3><p class="text-slate-500 dark:text-slate-400 mt-2">Try another search term or clear the search bar.</p></div>';
+            }
+
+            if (document.getElementById('commandTypesChart')) {
+                createCommandChart();
+            }
+            setupAnimations();
+        }
+        
+        function renderNavigation() {
+            let navHtml = '';
+            splData.sections.forEach(function(section) {
+                navHtml += '<a href="#' + section.id + '" class="nav-link block text-slate-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium p-2 rounded-lg">' + section.title + '</a>';
+            });
+            navigation.innerHTML = navHtml;
+        }
+
+        function createCommandChart() {
+            const ctx = document.getElementById('commandTypesChart')?.getContext('2d');
+            if (!ctx) return;
+
+            if (commandChartInstance) {
+                commandChartInstance.destroy();
+            }
+
+            const counts = { 'Generating': 0, 'Streaming': 0, 'Transforming': 0, 'Dataset Processing': 0 };
+            splData.sections.forEach(function(section) {
+                if (section.commands) {
+                    section.commands.forEach(function(cmd) {
+                        if (counts.hasOwnProperty(cmd.tier)) {
+                            counts[cmd.tier]++;
+                        }
+                    });
+                }
+            });
+            
+            const isDarkMode = document.documentElement.classList.contains('dark');
+            const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const labelColor = isDarkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)';
+
+            const data = {
+                labels: Object.keys(counts),
+                datasets: [{
+                    label: '# of Commands',
+                    data: Object.values(counts),
+                    backgroundColor: [ 'rgba(34, 197, 94, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(234, 179, 8, 0.7)', 'rgba(239, 68, 68, 0.7)' ],
+                    borderColor: [ 'rgb(34, 197, 94)', 'rgb(16, 185, 129)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)' ],
+                    borderWidth: 1
+                }]
+            };
+
+            commandChartInstance = new Chart(ctx, {
+                type: 'polarArea',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                color: labelColor,
+                                font: { size: 14 }
+                            }
+                        }
+                    },
+                    scales: { 
+                        r: { 
+                            grid: {
+                                color: gridColor
+                            },
+                            ticks: {
+                                backdropColor: 'transparent',
+                                color: labelColor
+                            },
+                             pointLabels: {
+                                 color: labelColor,
+                                 font: { size: 12 }
+                            }
+                        } 
+                    }
+                }
+            });
+        }
+
+        // Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+        const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            themeToggleLightIcon.classList.remove('hidden');
+            document.documentElement.classList.add('dark');
+        } else {
+            themeToggleDarkIcon.classList.remove('hidden');
+             document.documentElement.classList.remove('dark');
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            themeToggleDarkIcon.classList.toggle('hidden');
+            themeToggleLightIcon.classList.toggle('hidden');
+
+            if (localStorage.getItem('color-theme')) {
+                if (localStorage.getItem('color-theme') === 'light') {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                }
+            } else {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                }
+            }
+            createCommandChart(); // Re-render chart with new colors
+        });
+
+
+        function setupEventListeners() {
+            commandSearch.addEventListener('input', renderContent);
+
+            contentContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('copy-btn')) {
+                    const codeToCopy = e.target.dataset.code;
+                    const el = document.createElement('textarea');
+                    el.value = codeToCopy;
+                    document.body.appendChild(el);
+                    el.select();
+                    try {
+                        document.execCommand('copy');
+                        e.target.textContent = 'Copied!';
+                        setTimeout(function() { e.target.textContent = 'Copy'; }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                    }
+                    document.body.removeChild(el);
+                }
+            });
+        }
+
+        function setupAnimations() {
+            if (animationObserver) {
+                animationObserver.disconnect();
+            }
+
+            animationObserver = new IntersectionObserver(function(entries, observer) {
+                entries.forEach(function(entry, index) {
+                    if (entry.isIntersecting) {
+                        // Add a staggered delay based on the element's position
+                        setTimeout(function() {
+                           entry.target.classList.add('is-visible');
+                        }, index * 50); // 50ms delay between cards
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            const cards = document.querySelectorAll('.card-animate');
+            cards.forEach(function(card) {
+                animationObserver.observe(card);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderNavigation();
+            renderContent();
+            setupEventListeners();
+        });
+    </script>
+
+</body>
+</html>
