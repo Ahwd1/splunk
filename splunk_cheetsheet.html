@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Splunk SPL cheatsheet</title>
+    <title>Comprehensive Interactive Splunk SPL Guide</title>
     <!--
     Application Design Rationale:
     - Structure: A single-page app with a sticky sidebar that has a themed, custom scrollbar.
@@ -25,6 +25,11 @@
         }
         pre, code {
             font-family: 'Fira Code', monospace;
+        }
+        /* Add text wrapping to code blocks */
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         .chart-container {
             position: relative;
@@ -441,7 +446,7 @@
                 '<div>' +
                     '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Using Time Modifiers</h3>' +
                     '<p class="mb-4">You can specify the time range of your search using the `earliest` and `latest` modifiers. The format is `[+|-]<integer><unit>@<snap_time_unit>`.</p>' +
-                    '<pre class="bg-slate-900 text-slate-200 text-sm rounded-md p-4 overflow-x-auto"><code>sourcetype=access_combined error earliest=-1d@d latest=-h@h</code></pre>' +
+                    '<pre class="bg-slate-900 text-slate-200 text-sm rounded-md p-4"><code>sourcetype=access_combined error earliest=-1d@d latest=-h@h</code></pre>' +
                     '<p class="text-sm text-slate-600 dark:text-slate-400 mt-2">This search retrieves events containing "error" that occurred yesterday (snapping to the beginning of the day at 00:00:00) through the start of the current hour.</p>' +
                 '</div>' +
                 '<div>' +
@@ -592,7 +597,7 @@
                                                 return '<div>' +
                                                     '<p class="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">' + ex.title + '</p>' +
                                                     '<div class="relative group">' +
-                                                        '<pre class="bg-slate-900 text-slate-200 text-xs rounded-md p-3 overflow-x-auto"><code>' + ex.code + '</code></pre>' +
+                                                        '<pre class="bg-slate-900 text-slate-200 text-xs rounded-md p-3"><code>' + ex.code + '</code></pre>' +
                                                         '<button class="copy-btn absolute top-2 right-2 bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100" data-code="' + ex.code.replace(/"/g, '&quot;') + '">Copy</button>' +
                                                     '</div>' +
                                                     '<p class="text-xs text-slate-600 dark:text-slate-500 mt-2 bg-slate-100 dark:bg-slate-700/50 p-2 rounded-md">' + ex.explanation + '</p>' +
@@ -622,7 +627,7 @@
                                     '<div class="mt-4">' +
                                         '<h5 class="font-semibold text-slate-700 dark:text-slate-300 text-sm mb-2">Query</h5>' +
                                         '<div class="relative group">' +
-                                            '<pre class="bg-slate-900 text-slate-200 text-xs rounded-md p-3 overflow-x-auto"><code>' + sc.query + '</code></pre>' +
+                                            '<pre class="bg-slate-900 text-slate-200 text-xs rounded-md p-3"><code>' + sc.query + '</code></pre>' +
                                             '<button class="copy-btn absolute top-2 right-2 bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100" data-code="' + sc.query.replace(/"/g, '&quot;') + '">Copy</button>' +
                                         '</div>' +
                                     '</div>' +
