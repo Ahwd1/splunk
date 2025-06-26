@@ -11,7 +11,7 @@ i well try add more commands as am going .
 
 enjoy ^_^
 
-[splunk spl cheat sheet site ](https://ahwd1.github.io/splunk/splunk_cheetsheet.html)
+[splunk spl cheat sheet site ](https://ahwd1.github.io/Splunk-SPL-Cheatsheet/splunk_cheetsheet.html)
 
  
 ![Screenshot 2025-06-26 152117](https://github.com/user-attachments/assets/dda7ce72-fda6-4bf8-9da0-3c509b3d549d)
