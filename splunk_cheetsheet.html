@@ -6,7 +6,7 @@
     <title>Splunk SPL cheatsheet</title>
     <!--
     Application Design Rationale:
-    - Structure: A single-page app with a sticky sidebar for navigation and a main content area for command details. This allows for both structured browsing and quick, targeted searches.
+    - Structure: A single-page app with a sticky sidebar that has a themed, custom scrollbar.
     - Color Palette: A vibrant, high-contrast theme with green and dark slate was chosen to improve visual appeal and differentiate UI elements clearly, enhancing readability in both light and dark modes.
     - Interactivity & Animation:
         - Live Search: Instantly filters all content, providing immediate access to relevant commands and scenarios.
@@ -60,6 +60,32 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        /* Custom Scrollbar Styling */
+        aside::-webkit-scrollbar {
+            width: 8px;
+        }
+        aside::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        html.dark aside::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        aside::-webkit-scrollbar-thumb {
+            background-color: #d1d5db; /* gray-400 */
+            border-radius: 10px;
+            border: 2px solid #ffffff; /* white */
+        }
+        aside::-webkit-scrollbar-thumb:hover {
+            background-color: #9ca3af; /* gray-500 */
+        }
+        html.dark aside::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* gray-600 */
+            border: 2px solid #020617; /* slate-950 */
+        }
+        html.dark aside::-webkit-scrollbar-thumb:hover {
+            background-color: #374151; /* gray-700 */
+        }
     </style>
     <script>
         tailwind.config = {
@@ -81,7 +107,7 @@
 
     <div class="flex flex-col md:flex-row min-h-screen">
         <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-64 bg-white dark:bg-slate-950 border-b dark:border-b-0 md:border-r border-slate-200 dark:border-slate-800 p-4 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
+        <aside class="w-full md:w-64 bg-white dark:bg-slate-950 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 p-4 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-200">SPL Guide</h1>
                 <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
