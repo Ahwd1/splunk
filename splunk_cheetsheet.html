@@ -3,17 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comprehensive Interactive Splunk SPL Guide</title>
-    <!--
-    Application Design Rationale:
-    - Structure: A single-page app with a sticky sidebar that has a themed, custom scrollbar.
-    - Color Palette: A vibrant, high-contrast theme with green and dark slate was chosen to improve visual appeal and differentiate UI elements clearly, enhancing readability in both light and dark modes.
-    - Interactivity & Animation:
-        - Live Search: Instantly filters all content, providing immediate access to relevant commands and scenarios.
-        - Click-to-Copy: A core feature for a developer tool, streamlining the process of using example code.
-        - Dynamic Chart: The command types chart is generated from the actual data in the guide, providing a live, accurate visualization of the command distribution.
-        - Staggered Animations: Content cards now fade and slide into view as the user scrolls, creating a more engaging and modern feel. This is implemented using the Intersection Observer API for performance.
-    -->
+    <title>Splunk SPL cheatsheet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -211,6 +201,10 @@
                             {title: 'Single Field Aggregation', code: 'index=firewall action=deny \n| stats count BY dest_host \n| sort -count', explanation: 'This query counts the number of events, grouping them by the `dest_host` field. The result is a table listing each destination host and the number of deny events associated with it.'}, 
                             {title: 'Multiple Aggregations', code: 'index=sales \n| stats sum(price) AS revenue, dc(customer_id) AS buyers, avg(items) as avg_cart_size BY category_id', explanation: 'This creates a summary table grouped by `category_id`. For each category, it calculates the total `revenue`, the number of unique `buyers`, and the average cart size. It renames the new fields with `AS` for clarity.'} 
                         ]},
+                        { name: 'addtotals', purpose: 'Calculates the sum of all numeric fields for each result, or calculates row/column totals.', analysis: 'Useful for adding a summary row or column to a results table. By default, it creates a new field named "Total" for row sums. Use `col=true` to create a new row containing column totals.', tier: 'Streaming', examples: [
+                            {title: 'Sum of numeric fields per row', code: '... | stats count by product_line, region | xyseries product_line, region, count | addtotals', explanation: 'After creating a table of counts by product line and region, this adds a new "Total" column that sums up the counts for each product line across all regions.'},
+                            {title: 'Add a "Total" row to a table', code: '... | stats sum(sales) as "Sales" by product | addtotals col=true labelfield=product label="All Products"', explanation: 'This calculates the sum of sales for each product, and then adds a new row at the bottom named "All Products" that contains the grand total of all sales.'}
+                        ]},
                         { name: 'chart', purpose: 'Creates a tabular output suitable for visualizations like column, bar, and pie charts.', analysis: 'Similar to `stats` but pivots data. Use `OVER` for the x-axis and `BY` to split into series. It\'s a more direct way to get a chart-ready format than `stats` + `xyseries`.', tier: 'Transforming', examples: [ 
                             {title: 'Basic Chart', code: 'index=sales \n| chart count OVER product_name BY store_location', explanation: 'This creates a table ready for a stacked chart. `product_name` will be the x-axis. The values will be the event `count`. `store_location` will be the series, meaning each product will have a separate bar/segment for each store.'}, 
                             {title: 'Chart with eval', code: 'index=api_logs \n| chart eval(avg(response_ms)/1000) as "Avg Response (s)" OVER api_endpoint', explanation: 'This command calculates the average response time directly inside the `chart` command, converts it to seconds, and renames it. The resulting chart will show each `api_endpoint` on the x-axis and its average response time in seconds on the y-axis.'} 
@@ -245,10 +239,12 @@
                             {title: 'Time Between Events', code: 'index=vpn \n| sort 0 _time \n| streamstats current=f last(_time) as prev_time by user \n| eval time_diff = _time - prev_time', explanation: 'For each user, this calculates the time difference between consecutive events. `current=f` means the `last(_time)` value is from the previous event, not the current one. This is great for session analysis.'}
                         ]},
                         { name: 'accum', purpose: 'Calculates a running total of a numeric field.', analysis: 'A simple streaming command that is more lightweight than `streamstats` if all you need is a simple cumulative sum. The field you provide will be replaced by its running total.', tier: 'Streaming', examples: [
-                            {title: 'Cumulative Sum of Bytes', code: 'index=netflow | accum total_bytes', explanation: 'For each event, this command adds the value of `total_bytes` to the sum from the previous events, creating a running total in the `total_bytes` field.'}
+                            {title: 'Cumulative Sum of Bytes', code: 'index=netflow | accum total_bytes', explanation: 'For each event, this command adds the value of `total_bytes` to the sum from the previous events, creating a running total in the `total_bytes` field.'},
+                            {title: 'Cumulative Event Count', code: 'index=logins \n| eval event_counter=1 \n| accum event_counter', explanation: 'This first creates a field `event_counter` with a value of 1 for every event. Then, `accum` calculates the running total of this counter, effectively showing you the event number in the result set.'}
                         ]},
                         { name: 'delta', purpose: 'Calculates the difference between the value of a field in the current event and its value in the previous event.', analysis: 'Useful for calculating rates of change. Often used after a `sort` command to ensure events are in the correct order. The results are placed in a new field.', tier: 'Streaming', examples: [
-                            {title: 'Difference in Counter Values', code: 'index=perfmon counter=PageFaults \n| sort _time \n| delta value as page_fault_delta', explanation: 'This calculates the number of page faults that occurred between performance monitoring events by subtracting the current `value` from the previous one.'}
+                            {title: 'Difference in Counter Values', code: 'index=perfmon counter=PageFaults \n| sort _time \n| delta value as page_fault_delta', explanation: 'This calculates the number of page faults that occurred between performance monitoring events by subtracting the current `value` from the previous one.'},
+                            {title: 'Change in Login Count', code: 'index=auth | timechart count as login_count | delta login_count as login_change', explanation: 'First, `timechart` calculates the total number of logins per time bucket. Then, `delta` computes the difference in the login count from one time bucket to the next, showing the rate of change.'}
                         ]},
                         { name: 'mvexpand', purpose: 'Expands a multi-value field, creating a new event for each value in the field.', analysis: 'Essential for working with fields that contain multiple values (e.g., a `recipient` field with multiple email addresses). This command "un-rolls" the values so that each one can be processed individually by commands like `stats` or `chart`. Use with `mvjoin` to combine them back.', tier: 'Streaming', examples: [
                             {title: 'Count Individual Recipients', code: 'index=email \n| mvexpand recipients \n| stats count by recipients', explanation: 'If an email event has a `recipients` field with three addresses, `mvexpand` turns that single event into three separate events, each with a single recipient. `stats` can then correctly count the occurrences of each individual recipient address.'},
@@ -271,6 +267,10 @@
                             {title: 'Find Anomalous Login Counts', code: 'index=auth action=login \n| timechart span=1h count as logins \n| anomalydetection logins', explanation: 'This first creates a timechart of hourly logins. `anomalydetection` then analyzes this series and identifies any hours where the login count was unusually high or low compared to the established pattern, adding fields like `is_anomaly` and `expected_value`.'},
                             {title: 'Filter for Unusual Sales', code: 'index=sales \n| timechart span=1d sum(price) as daily_sales \n| anomalydetection daily_sales action=filter', explanation: 'This calculates total sales per day and then uses `anomalydetection` to pass through *only* the days where sales were determined to be anomalous. This is useful for feeding into an alert or a more detailed investigation.'}
                         ]},
+                        { name: 'fieldsummary', purpose: 'Calculates summary statistics for all fields in the result set.', analysis: 'A powerful command for data exploration. Unlike `stats`, you don\'t need to specify fields. It provides count, distinct count (dc), min, max, mean, stdev, and a list of values for each field.', tier: 'Transforming', examples: [
+                            {title: 'Summarize All Fields', code: 'index=_internal | head 1000 | fieldsummary', explanation: 'This search takes the first 1000 internal logs and generates a table that summarizes the characteristics of every single field found in those events.'},
+                            {title: 'Analyze Fields with High Cardinality', code: 'index=sales | fieldsummary | where distinct_count > 1000', explanation: 'This search first summarizes all fields in the `sales` index. It then filters those results to show only fields that have more than 1000 distinct values, which is useful for identifying high-cardinality fields that might be challenging for some types of analysis.'}
+                        ]},
                         { name: 'predict', purpose: 'Forecasts future values for a time series.', analysis: 'A powerful tool for capacity planning and trend analysis. It takes a time series from `timechart` as input and can use various algorithms (e.g., `LLP` for linear, `LLT` for seasonal). The `future_timespan` option determines how many time periods to predict into the future.', tier: 'Transforming', examples: [
                             {title: 'Forecast Future CPU Usage', code: 'index=os host=appserver* \n| timechart span=1h avg(cpu) as avg_cpu \n| predict avg_cpu future_timespan=24', explanation: 'This query calculates the hourly average CPU for application servers, then uses the `predict` command to forecast the next 24 hours of CPU usage. The output will include fields like `prediction(avg_cpu)`, `upper95(prediction(avg_cpu))`, and `lower95(prediction(avg_cpu))`.'},
                             {title: 'Predict Future Sales by Category', code: 'index=sales \n| timechart span=1d sum(price) as sales by category \n| predict sales', explanation: 'This demonstrates predicting multiple series at once. It creates a daily sales timechart split by category, and `predict` will generate a separate forecast for each product category.'}
@@ -287,6 +287,10 @@
                         { name: 'makeresults', purpose: 'A generating command that creates one or more empty events to start a search.', analysis: 'Essential for testing SPL logic without needing real data. It is also the foundation for searches that generate reports entirely from `eval` expressions or lookups, without using data from an index.', tier: 'Generating', examples: [
                             {title: 'Testing an eval Expression', code: '| makeresults \n| eval test_data = "hello world" \n| eval new_field = upper(test_data)', explanation: 'This search starts by creating a single, empty event. It then uses `eval` to create a field `test_data` and a second `eval` to test the `upper()` function on that data. This is a fast way to prototype SPL logic.'},
                             {title: 'Creating a Report from Scratch', code: '| makeresults count=3 \n| streamstats count as ID \n| eval user=case(ID=1, "alice", ID=2, "bob", ID=3, "charlie")', explanation: 'This creates three empty events. `streamstats` gives each one a unique ID (1, 2, 3). `eval` then uses this ID to create a table of user data from scratch, which could then be enriched with a lookup or used for other purposes.'}
+                        ]},
+                        { name: 'gentimes', purpose: 'A generating command that creates discrete, uniform time events.', analysis: 'Useful for generating a "complete" time range, which you can then use in a `map` or `append` command to ensure that all time buckets are represented, even if no data exists for them.', tier: 'Generating', examples: [
+                            {title: 'Generate Hourly Timestamps for Today', code: '| gentimes start=-1d@d end=@d increment=1h', explanation: 'This creates 24 events, one for each hour of yesterday. The fields `starttime` and `endtime` represent the beginning and end of each hour.'},
+                            {title: 'Generate 5-Minute Intervals', code: '| gentimes start=-1h increment=5m', explanation: 'This generates events for the last hour in 5-minute increments. This is useful for creating a time spine for reports where you want to ensure every time bucket is represented.'}
                         ]},
                         { name: 'inputlookup', purpose: 'A generating command that loads search results from a specified lookup file.', analysis: 'The primary way to start a search using a CSV or KV Store lookup as the data source. Use `append=t` to append lookup data to existing results instead of replacing them.', tier: 'Generating', examples: [ 
                             {title: 'Load a List of Servers', code: '| inputlookup servers.csv', explanation: 'This is a generating command that reads the `servers.csv` lookup file and uses its contents as the starting data for the search. Each row in the CSV becomes an event.'}, 
@@ -310,7 +314,7 @@
                         ]},
                         { name: 'appendcols', purpose: 'Appends the columns from a subsearch to the current results.', analysis: 'Adds the fields from the subsearch results as new columns. Only works reliably if the subsearch returns a single row of results; otherwise, it only uses the first row. Use `eventstats` for more robust solutions.', tier: 'Dataset Processing', examples: [
                             {title: 'Add Overall Total to Each Row', code: '... \n| stats sum(sales) as sales by user \n| appendcols [search ... | stats sum(sales) as total_sales]', explanation: 'The main search gets sales by user. The subsearch calculates the single grand total of all sales. `appendcols` adds this `total_sales` value as a new column to every row of the main result set.'},
-                            {title: 'Combining Two Different Metrics', code: '| stats count(errors) as error_count \n| appendcols [search index=security | stats count as security_events]', explanation: 'This creates a single result with two columns. The first part calculates the `error_count`. `appendcols` then runs a completely separate search to get the `security_events` count and adds that value as a new column.'}
+                            {title: 'Combining Two Different Metrics', code: '| makeresults | stats count(errors) as error_count \n| appendcols [search index=security | stats count as security_events]', explanation: 'This creates a single result with two columns. The first part calculates the `error_count`. `appendcols` then runs a completely separate search to get the `security_events` count and adds that value as a new column.'}
                         ]},
                         { name: 'transaction', purpose: 'Groups related raw events into a single, composite event.', analysis: 'Very powerful for sessionization but extremely resource-intensive. Use with caution. `maxspan` and `maxpause` are critical parameters to limit resource use. Often, `stats` with `values()` and `earliest()`/`latest()` is a much faster alternative.', tier: 'Transforming', examples: [ 
                             {title: 'Basic Web Sessionization', code: 'index=web \n| transaction clientip maxspan=30m', explanation: 'This command groups events by the `clientip` field. It starts a new transaction whenever a new `clientip` is seen, or if the time between events from the same IP exceeds 30 minutes (`maxspan`).'}, 
@@ -359,7 +363,8 @@
                             {title: 'Query an Accelerated Data Model', code: '| tstats summariesonly=t count FROM datamodel=Authentication WHERE nodename=Failed_Authentication by user', explanation: 'This query runs against a pre-calculated, accelerated data model for Authentication. `summariesonly=t` ensures it only uses the fast summary data. It gets a count of failed authentications grouped by user.'} 
                         ]},
                         { name: 'mstats', purpose: 'A high-performance command for running statistical queries on metrics data.', analysis: 'The metric-equivalent of `tstats`. Must be used on metric indexes. Much faster than running `search` against metric data.', tier: 'Generating', examples: [
-                           {title: 'Average CPU per Metric Name', code: '| mstats avg(_value) WHERE metric_name=*.cpu.percent by metric_name span=30s', explanation: 'This query calculates the average of all metrics ending in `cpu.percent`, grouped by the full metric name, in 30-second spans.'}
+                           {title: 'Average CPU per Metric Name', code: '| mstats avg(_value) WHERE metric_name=*.cpu.percent by metric_name span=30s', explanation: 'This query calculates the average of all metrics ending in `cpu.percent`, grouped by the full metric name, in 30-second spans.'},
+                           {title: 'Multiple Aggregations on a Specific Metric', code: '| mstats avg(container.cpu.usage) as avg_cpu, max(container.cpu.usage) as max_cpu WHERE index=metrics container_name="webapp-*" by container_name span=1m', explanation: 'This query runs against a metric index, calculates both the average and maximum CPU usage for containers with names starting with "webapp-", and presents the results in one-minute intervals.'}
                         ]},
                         { name: 'datamodel', purpose: 'A generating command to search a specific dataset within a data model.', analysis: 'Provides a CIM-compliant way to query data without knowing the underlying index or sourcetype. Much simpler than `tstats` but less performant. Excellent for ensuring searches work across different data sources that conform to the same model.', tier: 'Generating', examples: [
                             {title: 'Query Network Traffic Data Model', code: '| datamodel Network_Traffic All_Traffic search \n| stats count by src_ip', explanation: 'This is a generating command that searches the "All_Traffic" dataset within the "Network_Traffic" data model. It provides a standardized way to get network data without needing to know the specific index or sourcetype.'}, 
@@ -435,19 +440,20 @@
                     '</div>' +
                 '</div>' +
                 '<div>' +
-                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Core Splunk Components</h3>' +
-                    '<p class="mb-4">A Splunk environment is made of several key components working together.</p>' +
-                    '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">' +
-                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Forwarder</h4><p class="text-sm text-slate-600 dark:text-slate-400 mt-1">A Splunk instance that consumes and sends data to another Splunk instance (usually an Indexer). Resides on the machines where the data originates.</p></div>' +
-                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Indexer</h4><p class="text-sm text-slate-600 dark:text-slate-400 mt-1">The workhorse. It receives, parses, and stores incoming data into indexes. It also handles search requests, retrieving the data from disk.</p></div>' +
-                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Search Head</h4><p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Provides the user interface for searching. It distributes search requests to Indexers and merges the results back to the user.</p></div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">SPL Syntax Basics</h3>' +
+                    '<p class="mb-4">A search is a series of commands and arguments. Commands are chained together with a pipe `|` character. The output of one command becomes the input for the next.</p>' +
+                     '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Phrases</h4><p class="text-slate-600 dark:text-slate-400 mt-1">To search for a literal string containing spaces or special characters, enclose it in double quotes. For example, <code>"failed login"</code>.</p></div>' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Boolean Operators</h4><p class="text-slate-600 dark:text-slate-400 mt-1">Use `AND`, `OR`, and `NOT` to combine terms. They must be capitalized. `AND` is implied between terms (e.g., `web error` is the same as `web AND error`).</p></div>' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Comparison Operators</h4><p class="text-slate-600 dark:text-slate-400 mt-1">Use operators like `=`, `!=`, `>`, `<`, `>=`, `<=` to filter on field values. For example, <code>status>400</code>.</p></div>' +
+                        '<div class="p-4 bg-white dark:bg-slate-800 rounded-lg shadow"><h4 class="font-semibold text-lg text-primary-500">Wildcards</h4><p class="text-slate-600 dark:text-slate-400 mt-1">Use the asterisk `*` as a wildcard to match multiple characters. For example, <code>fail*</code> matches "fail", "failed", and "failure". Use it at the end of a term for best performance.</p></div>' +
                     '</div>' +
                 '</div>' +
                 '<div>' +
                     '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Using Time Modifiers</h3>' +
                     '<p class="mb-4">You can specify the time range of your search using the `earliest` and `latest` modifiers. The format is `[+|-]<integer><unit>@<snap_time_unit>`.</p>' +
-                    '<pre class="bg-slate-900 text-slate-200 text-sm rounded-md p-4"><code>sourcetype=access_combined error earliest=-1d@d latest=-h@h</code></pre>' +
-                    '<p class="text-sm text-slate-600 dark:text-slate-400 mt-2">This search retrieves events containing "error" that occurred yesterday (snapping to the beginning of the day at 00:00:00) through the start of the current hour.</p>' +
+                    '<pre class="bg-slate-900 text-slate-200 text-sm rounded-md p-4"><code>sourcetype=access_combined error earliest=-1d@d latest=@d</code></pre>' +
+                    '<p class="text-sm text-slate-600 dark:text-slate-400 mt-2">This search retrieves events containing "error" that occurred during the entirety of yesterday. `earliest=-1d@d` snaps to the beginning of yesterday, and `latest=@d` snaps to the beginning of today.</p>' +
                 '</div>' +
                 '<div>' +
                     '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-2">Command Processing Tiers</h3>' +
@@ -513,6 +519,29 @@
                                 '<tr class="dark:odd:bg-slate-800/50"><td><code>sum(X)</code></td><td>Returns the sum of the values of X.</td></tr>' +
                                 '<tr class="dark:odd:bg-slate-800/50"><td><code>values(X)</code></td><td>Returns the list of unique values of field X.</td></tr>' +
                                 '<tr class="dark:odd:bg-slate-800/50"><td><code>var(X)</code></td><td>Returns the sample variance of field X.</td></tr>' +
+                            '</tbody>' +
+                        '</table>' +
+                    '</div>' +
+                '</div>' +
+                 // Regex Reference Table
+                 '<div>' +
+                    '<h3 class="text-2xl font-bold text-slate-900 dark:text-slate-200 mb-4">Regular Expression Quick Reference</h3>' +
+                    '<div class="bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden">' +
+                        '<table class="min-w-full text-sm">' +
+                           '<thead class="bg-slate-100 dark:bg-slate-700"><tr class="text-left text-slate-600 dark:text-slate-300 font-semibold"><th>Regex</th><th>Description</th><th>Example</th></tr></thead>' +
+                            '<tbody class="divide-y divide-slate-200 dark:divide-slate-700">' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>.</code></td><td>Matches any single character (except newline)</td><td><code>a.c</code> matches "abc", "axc", etc.</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>*</code></td><td>Matches the preceding character zero or more times</td><td><code>ab*c</code> matches "ac", "abc", "abbbc"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>+</code></td><td>Matches the preceding character one or more times</td><td><code>ab+c</code> matches "abc", "abbbc"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>?</code></td><td>Matches the preceding character zero or one time</td><td><code>colou?r</code> matches "color" and "colour"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>\\d</code></td><td>Matches any digit (0-9)</td><td><code>\\d{3}</code> matches "123"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>\\s</code></td><td>Matches any whitespace character (space, tab)</td><td><code>a\\sb</code> matches "a b"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>\\w</code></td><td>Matches any word character (a-z, A-Z, 0-9, _)</td><td><code>\\w+</code> matches "hello_123"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>[...]</code></td><td>Matches any single character within the brackets</td><td><code>[aeiou]</code> matches any vowel</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>[^...]</code></td><td>Matches any single character not in the brackets</td><td><code>[^0-9]</code> matches any non-digit</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>^</code></td><td>Matches the beginning of a string</td><td><code>^start</code> matches "start of the line"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>$</code></td><td>Matches the end of a string</td><td><code>end$</code> matches "this is the end"</td></tr>' +
+                                '<tr class="dark:odd:bg-slate-800/50"><td><code>(?&lt;name&gt;...)</code></td><td>Named capturing group. Extracts the matched text into a field called `name`</td><td><code>(?&lt;user&gt;\\w+)</code></td></tr>' +
                             '</tbody>' +
                         '</table>' +
                     '</div>' +
