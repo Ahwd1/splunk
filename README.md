@@ -9,3 +9,5 @@ and here it is splunk spl query commands and syntax cheatsheet to help you ,
 i well try add more commands as am going .
 
 enjoy ^_^
+
+https://ahwd1.github.io/splunk/splunk_cheetsheet.html
